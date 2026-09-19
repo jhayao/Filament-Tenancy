@@ -5,7 +5,7 @@ namespace Liern\FilamentTenancy\Commands;
 use Illuminate\Console\Command;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
 use Liern\FilamentTenancy\Jobs\ProvisionWorkspace;
-use Liern\FilamentTenancy\Models\Tenant;
+use Liern\FilamentTenancy\Support\TenantModel;
 
 class RetryProvisioning extends Command
 {
@@ -15,7 +15,7 @@ class RetryProvisioning extends Command
 
     public function handle(): int
     {
-        $tenant = Tenant::find($this->argument('tenant'));
+        $tenant = TenantModel::get()::find($this->argument('tenant'));
         if (! $tenant || $tenant->status === ProvisioningStatus::Ready) {
             $this->error('Workspace must exist and not already be ready.');
 

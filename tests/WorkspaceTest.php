@@ -24,6 +24,8 @@ class WorkspaceTest extends TestCase
         $this->assertSame(ProvisioningStatus::Ready, $tenant->fresh()->status);
         $this->assertTrue($user->canAccessTenant($tenant));
         $this->assertTrue((bool) $tenant->users()->first()->pivot->is_owner);
+        $this->assertSame($user->id, $tenant->load('users')->users->sole()->id);
+        $this->assertSame(1, Tenant::whereHas('users', fn ($query) => $query->where('email', $user->email))->count());
         $this->assertNotSame('injected', $tenant->fresh()->database()->getName());
         $this->assertSame('central', DB::getDefaultConnection());
         $this->assertFalse(Schema::hasTable('notes'));

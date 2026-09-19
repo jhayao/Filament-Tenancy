@@ -9,7 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Artisan;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
-use Liern\FilamentTenancy\Models\Tenant;
+use Liern\FilamentTenancy\Support\TenantModel;
 use RuntimeException;
 use Throwable;
 
@@ -36,7 +36,7 @@ class ProvisionWorkspace implements ShouldQueue
 
     public function handle(): void
     {
-        $tenant = Tenant::findOrFail($this->tenantId);
+        $tenant = TenantModel::get()::findOrFail($this->tenantId);
         if ($tenant->status === ProvisioningStatus::Ready) {
             return;
         }
@@ -85,7 +85,7 @@ class ProvisionWorkspace implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        Tenant::whereKey($this->tenantId)
+        TenantModel::get()::whereKey($this->tenantId)
             ->where('status', '!=', ProvisioningStatus::Ready->value)
             ->update(['status' => ProvisioningStatus::Failed->value]);
     }

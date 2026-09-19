@@ -1,0 +1,9 @@
+{
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  },
+  "private": true,
+  "scripts": {
+    "test:browser": "node tests/Browser/workspaces.mjs"
+  }
+}

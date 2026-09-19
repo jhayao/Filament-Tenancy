@@ -10,7 +10,7 @@ Uses public `stancl/tenancy` v3.10, not the reference plugin's private v4 depend
 
 - PHP 8.3+; Laravel 12 or 13; Filament 5 with Livewire 4.
 - A new tenancy installation. This package owns Stancl's tenant model, database and queue bootstrappers, and lifecycle listeners; do not combine it with another tenancy provider or run `tenancy:install`.
-- SQLite, MySQL/MariaDB, or PostgreSQL supported by Stancl. Automated database integration tests use SQLite; MySQL/PostgreSQL need deployment-specific verification.
+- SQLite, MySQL/MariaDB, or PostgreSQL supported by Stancl. The integration suite runs against SQLite, MySQL and PostgreSQL. Verify credentials and database-creation privileges in your deployment.
 
 ## Install in an application
 
@@ -90,6 +90,55 @@ Alternatively declare `protected static bool $isScopedToTenant = false;` on each
 
 Visit `/admin` (or your panel's configured path), sign in, and create a workspace. The switcher also lets existing users create additional workspaces. Filament's tenant creation policy is respected; define a policy for `Liern\FilamentTenancy\Models\Tenant` to restrict signup.
 
+### Panel options
+
+The published configuration supplies application defaults. Fluent calls override them for that panel only:
+
+```php
+TenancyPlugin::make()
+    ->routePrefix('teams')
+    ->withTenantRegistration(App\Filament\Pages\RegisterOrganization::class)
+    ->withTenantMenu()
+    ->withTenantSwitcher()
+    ->searchableTenantMenu()
+    ->extraTenantMiddleware([App\Http\Middleware\AuditTenantAccess::class]);
+```
+
+| Configuration key | Fluent method | Default |
+| --- | --- | --- |
+| `route_prefix` | `routePrefix('teams')` | `workspaces` |
+| `registration_page` | `withTenantRegistration(Page::class)` | `RegisterWorkspace::class` |
+| `menu.enabled` | `withTenantMenu(false)` | `true` |
+| `menu.switcher_enabled` | `withTenantSwitcher(false)` | `true` |
+| `menu.searchable` | `searchableTenantMenu(false)` | `true` |
+| `extra_tenant_middleware` | `extraTenantMiddleware([...])` | `[]` |
+
+Use `withTenantRegistration(null)` (or `registration_page => null`) to remove self-service registration and its menu entry. Existing memberships remain usable. A replacement registration page must extend Filament's `RegisterTenant`; extend this package's `RegisterWorkspace` to retain its provisioning behavior. Route prefixes must be a single lowercase URL segment, such as `teams` or `client-workspaces`.
+
+Additional middleware runs after membership/readiness checks and is persistent on Livewire updates. The setup page also runs this middleware, but remains in the central context; middleware should handle that case. Fluent middleware arrays replace the configured list. Hiding the menu or switcher changes navigation only, not authorization.
+
+### Custom tenant model
+
+Set the application-wide `tenant_model` configuration to a concrete subclass of the package model:
+
+```php
+namespace App\Models;
+
+class Organization extends \Liern\FilamentTenancy\Models\Tenant
+{
+    // Add application-specific behavior here.
+}
+```
+
+```php
+// config/filament-tenancy.php
+ 'tenant_model' => App\Models\Organization::class,
+```
+
+The same model is used by Filament, Stancl, memberships, validation, provisioning, retries and the setup page. It is configured globally so workers do not depend on a panel being booted. Keep the inherited `workspaces` / `workspace_user` schema, string workspace IDs, status cast and central connection behavior. Custom tables and alternate key layouts are outside this extension contract. Register authorization policies for your configured model.
+
+Existing published configuration files can omit the new keys: defaults preserve `/workspaces/{slug}`, the existing registration page and searchable switcher. No schema migration is required. PostgreSQL membership reads explicitly cast application-owned user keys to text to match the existing string membership keys.
+
 ### Queue and retries
 
 Use an asynchronous queue for production:
@@ -129,4 +178,23 @@ composer test
 vendor/bin/pint --test
 ```
 
-The tests exercise provisioning, owner membership, input validation, failed setup/retry, two real SQLite tenant databases, Filament onboarding, access denial, HTTP resource rendering, Livewire isolation and revocation.
+The tests exercise provisioning, owner membership, input validation, failed setup/retry, separate tenant databases, Filament onboarding, access denial, HTTP resource rendering, Livewire isolation/revocation, custom models, panel options, real database queues, central sessions and context cleanup.
+
+Run integration tests only against a disposable central database: the suite resets its tables and creates/deletes tenant databases. The configured user needs database creation/deletion privileges.
+
+```bash
+TENANCY_TEST_DB=mysql TENANCY_TEST_PORT=3306 TENANCY_TEST_DATABASE=tenancy_test TENANCY_TEST_USERNAME=root TENANCY_TEST_PASSWORD=tenancy-test composer test
+TENANCY_TEST_DB=pgsql TENANCY_TEST_PORT=5432 TENANCY_TEST_DATABASE=tenancy_test TENANCY_TEST_USERNAME=postgres TENANCY_TEST_PASSWORD=tenancy-test composer test
+```
+
+`TENANCY_TEST_HOST` defaults to `127.0.0.1`. With no database selection, the suite uses temporary SQLite databases. CI runs both supported PHP/Laravel combinations against all three database drivers.
+
+The browser smoke test starts a temporary Testbench host and SQLite databases, signs in, creates two workspaces using a real queue worker, waits for setup polling, and switches between them. It removes its temporary data afterward.
+
+```bash
+npm ci
+npx playwright install --with-deps chromium
+npm run test:browser
+```
+
+Set `TENANCY_BROWSER_PORT` if the default port `8765` is occupied.

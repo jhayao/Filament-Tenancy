@@ -9,6 +9,7 @@ use Illuminate\Validation\Rule;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
 use Liern\FilamentTenancy\Jobs\ProvisionWorkspace;
 use Liern\FilamentTenancy\Models\Tenant;
+use Liern\FilamentTenancy\Support\TenantModel;
 
 class CreateWorkspace
 {
@@ -16,11 +17,11 @@ class CreateWorkspace
     {
         $validated = Validator::make($data, [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique(Tenant::class, 'slug')],
+            'slug' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique(TenantModel::get(), 'slug')],
         ])->validate();
 
         return DB::connection(config('filament-tenancy.central_connection'))->transaction(function () use ($owner, $validated) {
-            $tenant = Tenant::create([...$validated, 'status' => ProvisioningStatus::Pending]);
+            $tenant = TenantModel::get()::create([...$validated, 'status' => ProvisioningStatus::Pending]);
             $tenant->users()->attach($owner->getKey(), ['is_owner' => true]);
             ProvisionWorkspace::dispatch($tenant->getKey())->afterCommit();
 

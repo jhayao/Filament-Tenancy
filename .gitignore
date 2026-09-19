@@ -4,3 +4,5 @@
 /.phpunit.result.cache
 /testbench.yaml
 /.env
+
+/node_modules/

@@ -6,6 +6,7 @@ use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
 use Liern\FilamentTenancy\Models\Tenant;
+use Liern\FilamentTenancy\Support\TenantModel;
 
 class Provisioning extends Page
 {
@@ -25,7 +26,7 @@ class Provisioning extends Page
     protected function getWorkspace(): Tenant
     {
         $tenant = Filament::getTenant();
-        abort_unless($tenant instanceof Tenant && Filament::auth()->user()?->canAccessTenant($tenant), 404);
+        abort_unless(is_a($tenant, TenantModel::get()) && Filament::auth()->user()?->canAccessTenant($tenant), 404);
 
         return $tenant->refresh();
     }

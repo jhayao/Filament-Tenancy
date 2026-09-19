@@ -5,6 +5,7 @@ namespace Liern\FilamentTenancy\Models;
 use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
+use Liern\FilamentTenancy\Relations\WorkspaceUsers;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
@@ -24,7 +25,10 @@ class Tenant extends BaseTenant implements HasName, TenantWithDatabase
 
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(config('filament-tenancy.user_model'), 'workspace_user', 'workspace_id', 'user_id')->withPivot('is_owner')->withTimestamps();
+        $user = $this->newRelatedInstance(config('filament-tenancy.user_model'));
+
+        return (new WorkspaceUsers($user->newQuery(), $this, 'workspace_user', 'workspace_id', 'user_id', $this->getKeyName(), $user->getKeyName(), 'users'))
+            ->withPivot('is_owner')->withTimestamps();
     }
 
     public function getFilamentName(): string

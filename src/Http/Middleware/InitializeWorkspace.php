@@ -7,8 +7,8 @@ use Filament\Facades\Filament;
 use Filament\Models\Contracts\HasTenants;
 use Illuminate\Http\Request;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
-use Liern\FilamentTenancy\Models\Tenant;
 use Liern\FilamentTenancy\Pages\Provisioning;
+use Liern\FilamentTenancy\Support\TenantModel;
 
 class InitializeWorkspace
 {
@@ -16,7 +16,7 @@ class InitializeWorkspace
     {
         $tenant = Filament::getTenant();
         $user = Filament::auth()->user();
-        abort_unless($tenant instanceof Tenant && $user instanceof HasTenants && $user->canAccessTenant($tenant), 404);
+        abort_unless(is_a($tenant, TenantModel::get()) && $user instanceof HasTenants && $user->canAccessTenant($tenant), 404);
 
         // A batched Livewire request must not mix snapshots from different workspaces.
         $requestTenant = request()->attributes->get('liern.workspace');
