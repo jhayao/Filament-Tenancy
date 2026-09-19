@@ -10,13 +10,14 @@ use Liern\FilamentTenancy\Models\Tenant;
 class RetryProvisioning extends Command
 {
     protected $signature = 'workspaces:retry {tenant : Workspace UUID}';
-    protected $description = 'Requeue provisioning for a pending or failed workspace';
+
+    protected $description = 'Requeue provisioning for an unfinished workspace';
 
     public function handle(): int
     {
         $tenant = Tenant::find($this->argument('tenant'));
-        if (! $tenant || ! in_array($tenant->status, [ProvisioningStatus::Pending, ProvisioningStatus::Failed], true)) {
-            $this->error('Workspace must exist and be pending or failed.');
+        if (! $tenant || $tenant->status === ProvisioningStatus::Ready) {
+            $this->error('Workspace must exist and not already be ready.');
 
             return self::FAILURE;
         }

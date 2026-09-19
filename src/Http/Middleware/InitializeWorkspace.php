@@ -18,6 +18,11 @@ class InitializeWorkspace
         $user = Filament::auth()->user();
         abort_unless($tenant instanceof Tenant && $user instanceof HasTenants && $user->canAccessTenant($tenant), 404);
 
+        // A batched Livewire request must not mix snapshots from different workspaces.
+        $requestTenant = request()->attributes->get('liern.workspace');
+        abort_if($requestTenant !== null && $requestTenant !== $tenant->getKey(), 409);
+        request()->attributes->set('liern.workspace', $tenant->getKey());
+
         // Runs again for Livewire updates: never trust a stale status or membership.
         $tenant->refresh();
         if ($request->routeIs(Provisioning::getRouteName())) {

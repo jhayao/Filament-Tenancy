@@ -8,6 +8,7 @@ use Liern\FilamentTenancy\Http\Middleware\InitializeWorkspace;
 use Liern\FilamentTenancy\Models\Tenant;
 use Liern\FilamentTenancy\Pages\Provisioning;
 use Liern\FilamentTenancy\Pages\RegisterWorkspace;
+use LogicException;
 
 class TenancyPlugin implements Plugin
 {
@@ -34,9 +35,11 @@ class TenancyPlugin implements Plugin
 
     public function boot(Panel $panel): void
     {
-        // Dedicated databases have no tenant_id relationship to scope.
+        // Never mutate Resource's inherited static flag: it can affect other panels.
         foreach ($panel->getResources() as $resource) {
-            $resource::scopeToTenant(false);
+            if ($resource::isScopedToTenant()) {
+                throw new LogicException("{$resource} must extend Liern\\FilamentTenancy\\Resources\\TenantResource or declare protected static bool \$isScopedToTenant = false.");
+            }
         }
     }
 }

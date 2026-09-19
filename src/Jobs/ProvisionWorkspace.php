@@ -18,7 +18,9 @@ class ProvisionWorkspace implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable;
 
     public int $tries = 3;
+
     public int $timeout = 300;
+
     public array $backoff = [30, 120];
 
     public function __construct(public string $tenantId)
@@ -50,7 +52,9 @@ class ProvisionWorkspace implements ShouldQueue
                 $manager->createDatabase($tenant);
             }
 
-            $tenant->run(function () {
+            $previousTenant = tenant();
+            try {
+                tenancy()->initialize($tenant);
                 $path = config('filament-tenancy.migration_path');
                 if (! is_dir($path)) {
                     throw new RuntimeException('The tenant migration directory does not exist: '.$path);
@@ -65,7 +69,12 @@ class ProvisionWorkspace implements ShouldQueue
                         throw new RuntimeException('Tenant seeding failed.');
                     }
                 }
-            });
+            } finally {
+                tenancy()->end();
+                if ($previousTenant) {
+                    tenancy()->initialize($previousTenant);
+                }
+            }
 
             $tenant->update(['status' => ProvisioningStatus::Ready]);
         } catch (Throwable $exception) {
@@ -76,6 +85,8 @@ class ProvisionWorkspace implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        Tenant::find($this->tenantId)?->update(['status' => ProvisioningStatus::Failed]);
+        Tenant::whereKey($this->tenantId)
+            ->where('status', '!=', ProvisioningStatus::Ready->value)
+            ->update(['status' => ProvisioningStatus::Failed->value]);
     }
 }
