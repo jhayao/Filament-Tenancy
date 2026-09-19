@@ -1,6 +1,6 @@
-@include('filament-tenancy::partials.standalone-page-styles')
-
 <div class="lw-registration-page">
+    @include('filament-tenancy::partials.standalone-page-styles')
+
     <div class="lw-registration-content">
         <div class="lw-registration-copy">
             <h1 class="lw-page-heading">{{ __('filament-tenancy::tenancy.create_heading') }}</h1>

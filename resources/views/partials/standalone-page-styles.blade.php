@@ -127,6 +127,50 @@
 
     .lw-registration-form {
         width: 100%;
+        color-scheme: light;
+    }
+
+    .lw-registration-form .fi-input-wrp {
+        background: #fff;
+        box-shadow: 0 0 0 1px #cbd5e1;
+    }
+
+    .lw-registration-form .fi-input-wrp:focus-within {
+        box-shadow: 0 0 0 2px #4f8df7;
+    }
+
+    .lw-registration-form .fi-input-wrp.fi-invalid {
+        box-shadow: 0 0 0 1px #b42318;
+    }
+
+    .lw-registration-form .fi-input-wrp.fi-invalid:focus-within {
+        box-shadow: 0 0 0 2px #b42318;
+    }
+
+    .lw-registration-form input.fi-input {
+        color: #111827;
+        caret-color: #111827;
+        -webkit-text-fill-color: #111827;
+    }
+
+    .lw-registration-form input.fi-input::placeholder {
+        color: #667085;
+        -webkit-text-fill-color: #667085;
+        opacity: 1;
+    }
+
+    .lw-registration-form .fi-fo-field-label-content {
+        color: #111827;
+    }
+
+    .lw-registration-form .fi-sc-text,
+    .lw-registration-form .fi-input-wrp-label {
+        color: #667085;
+    }
+
+    .lw-registration-form .fi-fo-field-wrp-error-message,
+    .lw-registration-form .fi-fo-field-label-required-mark {
+        color: #b42318;
     }
 
     .lw-registration-form .fi-btn {

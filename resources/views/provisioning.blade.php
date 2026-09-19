@@ -1,6 +1,6 @@
-@include('filament-tenancy::partials.standalone-page-styles')
-
 <div class="lw-provisioning-page">
+    @include('filament-tenancy::partials.standalone-page-styles')
+
     @if ($status === \Liern\FilamentTenancy\Enums\ProvisioningStatus::Ready)
         <div class="lw-provisioning-state" role="status" aria-live="polite">
             <h1 class="lw-page-heading">{{ __('filament-tenancy::tenancy.ready_heading') }}</h1>
