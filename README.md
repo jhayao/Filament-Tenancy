@@ -1,4 +1,4 @@
-# Filament Tenancy
+# Lona Tenancy
 
 A standalone Filament v5 Composer plugin for dedicated database workspaces.
 
@@ -17,15 +17,15 @@ Uses public `stancl/tenancy` v3.10, not the reference plugin's private v4 depend
 This repository is a package, not a runnable Laravel application, and is not published to Packagist. Install the latest tagged release from GitHub by adding the repository to your application's `composer.json`:
 
 ```bash
-composer config repositories.filament-tenancy vcs https://github.com/jhayao/Filament-Tenancy.git
-composer require liern/filament-tenancy:^0.1
+composer config repositories.lona-tenancy vcs https://github.com/jhayao/lona-tenancy.git
+composer require jhayao/lona-tenancy:^0.3
 ```
 
 To install the current development branch instead, use `dev-main`:
 
 ```bash
-composer config repositories.filament-tenancy vcs https://github.com/jhayao/Filament-Tenancy.git
-composer require liern/filament-tenancy:dev-main
+composer config repositories.lona-tenancy vcs https://github.com/jhayao/lona-tenancy.git
+composer require jhayao/lona-tenancy:dev-main
 ```
 
 Then publish the package configuration and migrations in the application:

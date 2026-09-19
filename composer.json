@@ -1,5 +1,5 @@
 {
-    "name": "liern/filament-tenancy",
+    "name": "jhayao/lona-tenancy",
     "description": "Dedicated database workspaces for Filament v5.",
     "type": "library",
     "license": "MIT",
