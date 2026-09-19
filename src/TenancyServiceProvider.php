@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Liern\FilamentTenancy\Commands\RetryProvisioning;
 use Liern\FilamentTenancy\Http\Middleware\ResetWorkspaceContext;
+use Liern\FilamentTenancy\Models\WorkspaceDomain;
 use Liern\FilamentTenancy\Support\TenantModel;
 use Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper;
@@ -24,6 +25,7 @@ class TenancyServiceProvider extends ServiceProvider
     {
         config([
             'tenancy.tenant_model' => TenantModel::get(),
+            'tenancy.domain_model' => WorkspaceDomain::class,
             'tenancy.database.central_connection' => config('filament-tenancy.central_connection'),
             'tenancy.bootstrappers' => [DatabaseTenancyBootstrapper::class, QueueTenancyBootstrapper::class],
         ]);

@@ -38,14 +38,14 @@ try {
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(`${baseURL}/admin/login`);
     await page.getByLabel('Email address').fill('owner@example.test');
-    await page.getByLabel('Password', { exact: true }).fill('browser-password');
+    await page.locator('input[autocomplete="current-password"]').fill('browser-password');
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.waitForURL('**/admin/new');
 
     async function createWorkspace(name, slug) {
-        await page.getByLabel('Name', { exact: true }).fill(name);
-        await page.getByLabel('Workspace URL name', { exact: true }).fill(slug);
-        await page.getByRole('button', { name: 'Create', exact: true }).click();
+        await page.locator('[id="form.name"]').fill(name);
+        await page.locator('[id="form.slug"]').fill(slug);
+        await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
         await page.waitForURL(`**/admin/workspaces/${slug}/workspace-setup`);
         await page.getByText('Waiting for setup', { exact: true }).waitFor();
         php(['tests/Browser/artisan.php', 'queue:work', 'database', '--queue=tenant-provisioning', '--once', '--sleep=0']);
@@ -65,7 +65,10 @@ try {
     assert.deepEqual(errors, [], 'Browser JavaScript errors');
     console.log('Browser flow passed: login, two queued workspace registrations, polling, and switching.');
 } catch (error) {
-    if (page) console.error((await page.locator('body').innerText()).slice(0, 5000));
+    if (page) {
+        console.error((await page.locator('body').innerText()).slice(0, 5000));
+        console.error(await page.locator('input').evaluateAll(inputs => inputs.map(input => ({ id: input.id, type: input.type, labels: [...(input.labels || [])].map(label => label.textContent) }))));
+    }
     console.error(serverLog.slice(-5000));
     throw error;
 } finally {

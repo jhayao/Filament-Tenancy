@@ -21,7 +21,15 @@ class CreateWorkspace
         ])->validate();
 
         return DB::connection(config('filament-tenancy.central_connection'))->transaction(function () use ($owner, $validated) {
-            $tenant = TenantModel::get()::create([...$validated, 'status' => ProvisioningStatus::Pending]);
+            $pool = config('filament-tenancy.database_pool', []);
+            $extraData = [];
+
+            if (! empty($pool)) {
+                // Simple random allocation, can be expanded to round-robin or capacity-based
+                $extraData['tenancy_db_connection'] = $pool[array_rand($pool)];
+            }
+
+            $tenant = TenantModel::get()::create([...$validated, ...$extraData, 'status' => ProvisioningStatus::Pending]);
             $tenant->users()->attach($owner->getKey(), ['is_owner' => true]);
             ProvisionWorkspace::dispatch($tenant->getKey())->afterCommit();
 

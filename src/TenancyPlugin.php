@@ -8,6 +8,8 @@ use Filament\Panel;
 use Liern\FilamentTenancy\Http\Middleware\InitializeWorkspace;
 use Liern\FilamentTenancy\Pages\Provisioning;
 use Liern\FilamentTenancy\Pages\RegisterWorkspace;
+use Liern\FilamentTenancy\Pages\WorkspaceBilling;
+use Liern\FilamentTenancy\Resources\TenantResource;
 use Liern\FilamentTenancy\Support\TenantModel;
 use LogicException;
 use ReflectionClass;
@@ -89,20 +91,33 @@ class TenancyPlugin implements Plugin
 
         $panel
             ->tenant(TenantModel::get(), slugAttribute: 'slug')
-            ->tenantRoutePrefix($prefix)
             ->tenantRegistration($registration)
             ->tenantMenu($this->option('menu.enabled'))
             ->tenantSwitcher($this->option('menu.switcher_enabled'))
             ->searchableTenantMenu($this->option('menu.searchable'))
             ->pages([Provisioning::class])
             ->tenantMiddleware([InitializeWorkspace::class, ...$this->option('extra_tenant_middleware')], isPersistent: true);
+
+        if ($this->option('identification') === 'subdomain') {
+            $panel->tenantDomain('{tenant:slug}.'.$this->option('central_domain'));
+        } else {
+            $panel->tenantRoutePrefix($prefix);
+        }
+
+        if ($this->option('profile.enabled') && $this->option('profile.page')) {
+            $panel->tenantProfile($this->option('profile.page'));
+        }
+
+        if ($this->option('billing.enabled')) {
+            $panel->pages([WorkspaceBilling::class]);
+        }
     }
 
     public function boot(Panel $panel): void
     {
         // Never mutate Resource's inherited static flag: it can affect other panels.
         foreach ($panel->getResources() as $resource) {
-            if ($resource::isScopedToTenant()) {
+            if ($resource::isScopedToTenant() && ! is_subclass_of($resource, TenantResource::class)) {
                 throw new LogicException("{$resource} must extend Liern\\FilamentTenancy\\Resources\\TenantResource or declare protected static bool \$isScopedToTenant = false.");
             }
         }

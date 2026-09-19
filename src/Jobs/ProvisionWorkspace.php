@@ -44,35 +44,39 @@ class ProvisionWorkspace implements ShouldQueue
         $tenant->update(['status' => ProvisioningStatus::Provisioning]);
 
         try {
-            $database = $tenant->database();
-            $database->makeCredentials();
-            $manager = $database->manager();
+            $strategy = $tenant->isolation_mode ?? config('filament-tenancy.database_strategy', 'dedicated');
 
-            if (! $manager->databaseExists($database->getName())) {
-                $manager->createDatabase($tenant);
-            }
+            if ($strategy === 'dedicated') {
+                $database = $tenant->database();
+                $database->makeCredentials();
+                $manager = $database->manager();
 
-            $previousTenant = tenant();
-            try {
-                tenancy()->initialize($tenant);
-                $path = config('filament-tenancy.migration_path');
-                if (! is_dir($path)) {
-                    throw new RuntimeException('The tenant migration directory does not exist: '.$path);
+                if (! $manager->databaseExists($database->getName())) {
+                    $manager->createDatabase($tenant);
                 }
 
-                if (Artisan::call('migrate', ['--database' => 'tenant', '--path' => [$path], '--realpath' => true, '--force' => true]) !== 0) {
-                    throw new RuntimeException('Tenant migrations failed.');
-                }
-
-                if ($seeder = config('filament-tenancy.seeder')) {
-                    if (Artisan::call('db:seed', ['--database' => 'tenant', '--class' => $seeder, '--force' => true]) !== 0) {
-                        throw new RuntimeException('Tenant seeding failed.');
+                $previousTenant = tenant();
+                try {
+                    tenancy()->initialize($tenant);
+                    $path = config('filament-tenancy.migration_path');
+                    if (! is_dir($path)) {
+                        throw new RuntimeException('The tenant migration directory does not exist: '.$path);
                     }
-                }
-            } finally {
-                tenancy()->end();
-                if ($previousTenant) {
-                    tenancy()->initialize($previousTenant);
+
+                    if (Artisan::call('migrate', ['--database' => 'tenant', '--path' => [$path], '--realpath' => true, '--force' => true]) !== 0) {
+                        throw new RuntimeException('Tenant migrations failed.');
+                    }
+
+                    if ($seeder = config('filament-tenancy.seeder')) {
+                        if (Artisan::call('db:seed', ['--database' => 'tenant', '--class' => $seeder, '--force' => true]) !== 0) {
+                            throw new RuntimeException('Tenant seeding failed.');
+                        }
+                    }
+                } finally {
+                    tenancy()->end();
+                    if ($previousTenant) {
+                        tenancy()->initialize($previousTenant);
+                    }
                 }
             }
 
