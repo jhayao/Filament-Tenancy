@@ -1,13 +1,28 @@
-<x-filament-panels::page>
-    <x-filament::section>
-        <div wire:poll.3s="checkStatus" role="status" aria-live="polite">
-            <h2>{{ $workspaceName }}</h2>
-            <p>{{ $status->getLabel() }}</p>
-            @if ($status === \Liern\FilamentTenancy\Enums\ProvisioningStatus::Failed)
-                <p>{{ __('filament-tenancy::tenancy.failed_help') }}</p>
-            @else
-                <p>{{ __('filament-tenancy::tenancy.wait_help') }}</p>
-            @endif
+@include('filament-tenancy::partials.standalone-page-styles')
+
+<div class="lw-provisioning-page">
+    @if ($status === \Liern\FilamentTenancy\Enums\ProvisioningStatus::Ready)
+        <div class="lw-provisioning-state" role="status" aria-live="polite">
+            <h1 class="lw-page-heading">{{ __('filament-tenancy::tenancy.ready_heading') }}</h1>
+            <p class="lw-page-supporting-text">{{ __('filament-tenancy::tenancy.ready_help') }}</p>
+            <a class="lw-primary-action" href="{{ $dashboardUrl }}">
+                {{ __('filament-tenancy::tenancy.go_to_dashboard') }}
+            </a>
         </div>
-    </x-filament::section>
-</x-filament-panels::page>
+    @elseif ($status === \Liern\FilamentTenancy\Enums\ProvisioningStatus::Failed)
+        <div class="lw-provisioning-state" role="status" aria-live="assertive">
+            <h1 class="lw-page-heading">{{ __('filament-tenancy::tenancy.failed_heading') }}</h1>
+            <p class="lw-page-supporting-text">{{ __('filament-tenancy::tenancy.failed_help') }}</p>
+            <button class="lw-primary-action" type="button" wire:click="retryProvisioning">
+                {{ __('filament-tenancy::tenancy.retry') }}
+            </button>
+        </div>
+    @else
+        <div class="lw-provisioning-state" wire:poll.3s="checkStatus" role="status" aria-live="polite" aria-busy="true">
+            <div class="lw-spinner" aria-hidden="true"></div>
+            <span class="fi-sr-only">{{ $status->getLabel() }}</span>
+            <h1 class="lw-page-heading">{{ __('filament-tenancy::tenancy.provisioning_heading', ['workspace' => $workspaceName]) }}</h1>
+            <p class="lw-page-supporting-text">{{ __('filament-tenancy::tenancy.provisioning_help') }}</p>
+        </div>
+    @endif
+</div>

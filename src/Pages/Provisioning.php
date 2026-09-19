@@ -5,6 +5,7 @@ namespace Liern\FilamentTenancy\Pages;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
+use Liern\FilamentTenancy\Jobs\ProvisionWorkspace;
 use Liern\FilamentTenancy\Models\Tenant;
 use Liern\FilamentTenancy\Support\TenantModel;
 
@@ -17,6 +18,8 @@ class Provisioning extends Page
     protected string $view = 'filament-tenancy::provisioning';
 
     protected static string $layout = 'filament-panels::components.layout.simple';
+
+    protected array $extraBodyAttributes = ['class' => 'lw-standalone-page'];
 
     public function getTitle(): string
     {
@@ -35,14 +38,29 @@ class Provisioning extends Page
     {
         $tenant = $this->getWorkspace();
 
-        return ['workspaceName' => $tenant->name, 'status' => $tenant->status];
+        return [
+            'workspaceName' => $tenant->name,
+            'status' => $tenant->status,
+            'dashboardUrl' => Filament::getUrl($tenant),
+        ];
+    }
+
+    protected function getLayoutData(): array
+    {
+        return ['hasTopbar' => false];
     }
 
     public function checkStatus(): void
     {
+        $this->getWorkspace();
+    }
+
+    public function retryProvisioning(): void
+    {
         $tenant = $this->getWorkspace();
-        if ($tenant->status === ProvisioningStatus::Ready) {
-            $this->redirect(Filament::getUrl($tenant));
-        }
+        abort_unless($tenant->status === ProvisioningStatus::Failed, 404);
+
+        $tenant->update(['status' => ProvisioningStatus::Pending]);
+        ProvisionWorkspace::dispatch($tenant->getKey());
     }
 }
