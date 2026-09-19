@@ -9,7 +9,7 @@ use Liern\FilamentTenancy\Support\TenantModel;
 
 class RetryProvisioning extends Command
 {
-    protected $signature = 'workspaces:retry {tenant : Workspace UUID}';
+    protected $signature = 'workspaces:retry {tenant : Workspace ID}';
 
     protected $description = 'Requeue provisioning for an unfinished workspace';
 

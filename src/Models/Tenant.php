@@ -17,7 +17,21 @@ class Tenant extends BaseTenant implements HasName, TenantWithDatabase
 
     protected $table = 'workspaces';
 
+    protected $keyType = 'int';
+
+    public $incrementing = true;
+
     protected $casts = ['status' => ProvisioningStatus::class];
+
+    public function getIncrementing(): bool
+    {
+        return true;
+    }
+
+    public function shouldGenerateId(): bool
+    {
+        return false;
+    }
 
     public static function getCustomColumns(): array
     {

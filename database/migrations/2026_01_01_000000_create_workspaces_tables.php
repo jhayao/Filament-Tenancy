@@ -14,7 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::connection($this->getConnection())->create('workspaces', function (Blueprint $table) {
-            $table->string('id')->primary();
+            $table->id();
             $table->string('name');
             $table->string('slug', 63)->unique();
             $table->string('status')->default('pending')->index();
@@ -23,7 +23,7 @@ return new class extends Migration
         });
 
         Schema::connection($this->getConnection())->create('workspace_user', function (Blueprint $table) {
-            $table->string('workspace_id');
+            $table->unsignedBigInteger('workspace_id');
             // String keys support numeric, UUID and ULID user IDs without owning the users table.
             $table->string('user_id');
             $table->boolean('is_owner')->default(false);

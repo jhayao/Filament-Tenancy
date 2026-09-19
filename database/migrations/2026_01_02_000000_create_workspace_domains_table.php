@@ -16,7 +16,7 @@ return new class extends Migration
         Schema::connection($this->getConnection())->create('workspace_domains', function (Blueprint $table) {
             $table->increments('id');
             $table->string('domain', 255)->unique();
-            $table->string('workspace_id');
+            $table->unsignedBigInteger('workspace_id');
             $table->timestamps();
 
             $table->foreign('workspace_id')->references('id')->on('workspaces')->onUpdate('cascade')->onDelete('cascade');

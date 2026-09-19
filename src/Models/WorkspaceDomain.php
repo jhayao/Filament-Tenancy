@@ -26,7 +26,7 @@ class WorkspaceDomain extends Model implements Domain
         return $this->domain;
     }
 
-    public function getTenantKey(): string
+    public function getTenantKey(): string|int
     {
         return $this->workspace_id;
     }

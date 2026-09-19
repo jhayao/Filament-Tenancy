@@ -11,6 +11,7 @@ use Liern\FilamentTenancy\Models\WorkspaceDomain;
 use Liern\FilamentTenancy\Support\TenantModel;
 use Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper;
+use Stancl\Tenancy\DatabaseConfig;
 use Stancl\Tenancy\Events;
 use Stancl\Tenancy\Listeners;
 
@@ -23,6 +24,10 @@ class TenancyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        DatabaseConfig::generateDatabaseNamesUsing(
+            fn ($tenant): string => config('filament-tenancy.database_name_prefix', 'tenant_').$tenant->getAttribute('slug')
+        );
+
         config([
             'tenancy.tenant_model' => TenantModel::get(),
             'tenancy.domain_model' => WorkspaceDomain::class,

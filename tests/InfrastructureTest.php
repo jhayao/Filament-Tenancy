@@ -55,7 +55,7 @@ class InfrastructureTest extends TestCase
         Schema::create('job_contexts', function (Blueprint $table) {
             $table->id();
             $table->string('label');
-            $table->string('tenant_id')->nullable();
+            $table->unsignedBigInteger('tenant_id')->nullable();
             $table->string('connection');
         });
     }

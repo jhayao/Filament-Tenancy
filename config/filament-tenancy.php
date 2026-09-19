@@ -10,6 +10,7 @@ return [
     'identification' => 'path', // 'subdomain' or 'path'
     'central_domain' => env('TENANCY_CENTRAL_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
     'database_strategy' => 'dedicated', // 'dedicated' or 'shared'
+    'database_name_prefix' => env('TENANCY_DATABASE_NAME_PREFIX', 'tenant_'),
     'route_prefix' => 'workspaces',
     'registration_page' => RegisterWorkspace::class, // null disables self-service registration.
     'menu' => ['enabled' => true, 'switcher_enabled' => true, 'searchable' => true],

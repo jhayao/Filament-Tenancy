@@ -23,7 +23,7 @@ class ProvisionWorkspace implements ShouldQueue
 
     public array $backoff = [30, 120];
 
-    public function __construct(public string $tenantId)
+    public function __construct(public int|string $tenantId)
     {
         $this->onConnection(config('filament-tenancy.queue_connection'));
         $this->onQueue(config('filament-tenancy.queue'));

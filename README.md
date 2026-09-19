@@ -2,7 +2,7 @@
 
 A standalone Filament v5 Composer plugin for dedicated database workspaces.
 
-This first version provides workspace onboarding, central users and memberships, Filament's searchable workspace switcher, queued database creation/migrations/optional seeding, a polling setup screen, and an operator retry command. Each workspace has its own database; tenant tables do not need `tenant_id`.
+This first version provides workspace onboarding, central users and memberships, Filament's searchable workspace switcher, queued database creation/migrations/optional seeding, a polling setup screen, and an operator retry command. Each workspace has its own database named `tenant_{slug}` and an auto-incrementing integer ID; tenant tables do not need `tenant_id`.
 
 Uses public `stancl/tenancy` v3.10, not the reference plugin's private v4 dependency. Path routing keeps login and workspaces on one origin: `/admin/workspaces/acme`. Subdomains, custom domains, shared databases, database pools, billing, invitations, resource syncing, and automatic database deletion are not included.
 
@@ -39,7 +39,7 @@ mkdir -p database/migrations/tenant
 
 Migrations are explicitly published, not automatically loaded in production. Keep users, memberships, sessions, jobs, failed jobs, and database cache tables in central migrations. Put only workspace business tables in `database/migrations/tenant`. Do not copy the central users migration there.
 
-Set `TENANCY_CENTRAL_CONNECTION` to your named central connection (defaults to `DB_CONNECTION`). SQLite creates workspace database files in the application's `database` directory; make it writable. MySQL/PostgreSQL credentials need database-creation privileges. To use a separate server/template connection, publish Stancl's config without its installer:
+Set `TENANCY_CENTRAL_CONNECTION` to your named central connection (defaults to `DB_CONNECTION`). Fresh installs name databases with the `tenant_` prefix followed by the workspace slug; set `TENANCY_DATABASE_NAME_PREFIX` to change the prefix. Keep slugs stable after provisioning because the generated database name is stored with the workspace. SQLite creates workspace database files in the application's `database` directory; make it writable. MySQL/PostgreSQL credentials need database-creation privileges. To use a separate server/template connection, publish Stancl's config without its installer:
 
 ```bash
 php artisan vendor:publish --provider='Stancl\Tenancy\TenancyServiceProvider' --tag=config
@@ -135,7 +135,7 @@ class Organization extends \Liern\FilamentTenancy\Models\Tenant
  'tenant_model' => App\Models\Organization::class,
 ```
 
-The same model is used by Filament, Stancl, memberships, validation, provisioning, retries and the setup page. It is configured globally so workers do not depend on a panel being booted. Keep the inherited `workspaces` / `workspace_user` schema, string workspace IDs, status cast and central connection behavior. Custom tables and alternate key layouts are outside this extension contract. Register authorization policies for your configured model.
+The same model is used by Filament, Stancl, memberships, validation, provisioning, retries and the setup page. It is configured globally so workers do not depend on a panel being booted. Keep the inherited `workspaces` / `workspace_user` schema, integer workspace IDs, status cast and central connection behavior. Custom tables and alternate key layouts are outside this extension contract. Register authorization policies for your configured model.
 
 Existing published configuration files can omit the new keys: defaults preserve `/workspaces/{slug}`, the existing registration page and searchable switcher. No schema migration is required. PostgreSQL membership reads explicitly cast application-owned user keys to text to match the existing string membership keys.
 
@@ -149,7 +149,7 @@ TENANCY_QUEUE_CONNECTION=database
 
 ```bash
 php artisan queue:work database --queue=tenant-provisioning --timeout=300
-php artisan workspaces:retry WORKSPACE_UUID
+php artisan workspaces:retry WORKSPACE_ID
 ```
 
 Create the normal Laravel queue tables centrally if using the database queue. Use a shared cache driver that supports atomic locks for multiple workers. Set the queue's `retry_after` (or visibility timeout) above the job's 300-second timeout and the lock's 360-second expiry, for example 420 seconds. The job retries up to three times, with 30/120-second backoff. Synchronous queues work for local use but complete provisioning during signup instead of in the background.
