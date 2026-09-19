@@ -1,6 +1,6 @@
 # Filament Tenancy
 
-A standalone Filament v5 Composer plugin for dedicated database workspaces. Independently implemented from the public [Packstub feature description](https://packstub.dev/docs/filament-tenancy); not affiliated with Packstub and contains no Packstub package source.
+A standalone Filament v5 Composer plugin for dedicated database workspaces.
 
 This first version provides workspace onboarding, central users and memberships, Filament's searchable workspace switcher, queued database creation/migrations/optional seeding, a polling setup screen, and an operator retry command. Each workspace has its own database; tenant tables do not need `tenant_id`.
 
@@ -14,20 +14,23 @@ Uses public `stancl/tenancy` v3.10, not the reference plugin's private v4 depend
 
 ## Install in an application
 
-This repository is a package, not a runnable Laravel application, and is not published to Packagist. Add a path repository to your application's `composer.json`:
-
-```json
-{
-    "repositories": [
-        {"type": "path", "url": "/home/liern/tenancy", "options": {"symlink": true}}
-    ]
-}
-```
-
-Then run in that application:
+This repository is a package, not a runnable Laravel application, and is not published to Packagist. Install the latest tagged release from GitHub by adding the repository to your application's `composer.json`:
 
 ```bash
-composer require liern/filament-tenancy:@dev
+composer config repositories.filament-tenancy vcs https://github.com/jhayao/Filament-Tenancy.git
+composer require liern/filament-tenancy:^0.1
+```
+
+To install the current development branch instead, use `dev-main`:
+
+```bash
+composer config repositories.filament-tenancy vcs https://github.com/jhayao/Filament-Tenancy.git
+composer require liern/filament-tenancy:dev-main
+```
+
+Then publish the package configuration and migrations in the application:
+
+```bash
 php artisan vendor:publish --tag=filament-tenancy-config
 php artisan vendor:publish --tag=filament-tenancy-migrations
 php artisan migrate
