@@ -1,12 +1,33 @@
 <style>
     body.lw-standalone-page {
-        background: #f8fafc !important;
-        color: #111827;
+        --lw-page-background: #f8fafc;
+        --lw-page-foreground: #111827;
+        --lw-page-muted: #667085;
+        --lw-input-background: #fff;
+        --lw-input-border: #cbd5e1;
+        --lw-spinner-track: #cfe0ff;
+        --lw-focus: #cfe0ff;
+        --lw-error: #b42318;
+        background: var(--lw-page-background) !important;
+        color: var(--lw-page-foreground);
+        color-scheme: light;
+    }
+
+    html.dark body.lw-standalone-page {
+        --lw-page-background: #111827;
+        --lw-page-foreground: #f9fafb;
+        --lw-page-muted: #9ca3af;
+        --lw-input-background: #1f2937;
+        --lw-input-border: #4b5563;
+        --lw-spinner-track: #374151;
+        --lw-focus: #93c5fd;
+        --lw-error: #fca5a5;
+        color-scheme: dark;
     }
 
     body.lw-standalone-page .fi-simple-layout {
         min-height: 100dvh;
-        background: #f8fafc;
+        background: var(--lw-page-background);
     }
 
     body.lw-standalone-page .fi-simple-layout-header {
@@ -58,7 +79,7 @@
         margin: 0 auto 26px;
         position: relative;
         border-radius: 999px;
-        background: conic-gradient(#4f8df7 0deg 100deg, #cfe0ff 100deg 360deg);
+        background: conic-gradient(#4f8df7 0deg 100deg, var(--lw-spinner-track) 100deg 360deg);
         animation: lw-spinner-rotate 900ms linear infinite;
     }
 
@@ -67,12 +88,12 @@
         position: absolute;
         inset: 10px;
         border-radius: inherit;
-        background: #f8fafc;
+        background: var(--lw-page-background);
     }
 
     .lw-page-heading {
         margin: 0;
-        color: #111827;
+        color: var(--lw-page-foreground);
         font-size: 24px;
         font-weight: 700;
         letter-spacing: -0.02em;
@@ -82,7 +103,7 @@
     .lw-page-supporting-text {
         max-width: 560px;
         margin: 10px auto 0;
-        color: #667085;
+        color: var(--lw-page-muted);
         font-size: 18px;
         font-weight: 400;
         line-height: 1.5;
@@ -112,7 +133,7 @@
     }
 
     .lw-primary-action:focus-visible {
-        outline: 3px solid #cfe0ff;
+        outline: 3px solid var(--lw-focus);
         outline-offset: 3px;
     }
 
@@ -127,12 +148,12 @@
 
     .lw-registration-form {
         width: 100%;
-        color-scheme: light;
+        color-scheme: inherit;
     }
 
     .lw-registration-form .fi-input-wrp {
-        background: #fff;
-        box-shadow: 0 0 0 1px #cbd5e1;
+        background: var(--lw-input-background);
+        box-shadow: 0 0 0 1px var(--lw-input-border);
     }
 
     .lw-registration-form .fi-input-wrp:focus-within {
@@ -148,29 +169,29 @@
     }
 
     .lw-registration-form input.fi-input {
-        color: #111827;
-        caret-color: #111827;
-        -webkit-text-fill-color: #111827;
+        color: var(--lw-page-foreground);
+        caret-color: var(--lw-page-foreground);
+        -webkit-text-fill-color: var(--lw-page-foreground);
     }
 
     .lw-registration-form input.fi-input::placeholder {
-        color: #667085;
-        -webkit-text-fill-color: #667085;
+        color: var(--lw-page-muted);
+        -webkit-text-fill-color: var(--lw-page-muted);
         opacity: 1;
     }
 
     .lw-registration-form .fi-fo-field-label-content {
-        color: #111827;
+        color: var(--lw-page-foreground);
     }
 
     .lw-registration-form .fi-sc-text,
     .lw-registration-form .fi-input-wrp-label {
-        color: #667085;
+        color: var(--lw-page-muted);
     }
 
     .lw-registration-form .fi-fo-field-wrp-error-message,
     .lw-registration-form .fi-fo-field-label-required-mark {
-        color: #b42318;
+        color: var(--lw-error);
     }
 
     .lw-registration-form .fi-btn {

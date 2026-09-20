@@ -92,7 +92,8 @@ class WorkspaceProfile extends EditTenantProfile
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $data['logo'] = $this->tenant->getAttribute('logo_path');
+        $logoPath = $this->tenant->getAttribute('logo_path');
+        $data['logo'] = filled($logoPath) ? [$logoPath] : [];
         $data['workspace_url'] = $this->getWorkspaceUrl();
 
         return $data;
@@ -102,7 +103,8 @@ class WorkspaceProfile extends EditTenantProfile
     {
         $data = array_intersect_key($data, array_flip(['name', 'description', 'email', 'phone', 'logo']));
         $oldLogo = $this->tenant->getAttribute('logo_path');
-        $newLogo = $data['logo'] ?? null;
+        $newLogo = $data['logo'] ?? [];
+        $newLogo = is_array($newLogo) ? ($newLogo[0] ?? null) : $newLogo;
 
         unset($data['logo']);
 

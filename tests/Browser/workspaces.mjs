@@ -42,20 +42,57 @@ try {
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.waitForURL('**/admin/new');
 
-    async function createWorkspace(name, slug) {
+    async function setTheme(theme) {
+        await page.evaluate((value) => {
+            localStorage.setItem('theme', value);
+            document.documentElement.classList.toggle('dark', value === 'dark');
+        }, theme);
+        await page.reload();
+        await page.waitForURL('**/admin/new');
+    }
+
+    async function assertStandaloneTheme(theme) {
+        const colors = await page.locator('body').evaluate((body) => ({
+            background: getComputedStyle(body).backgroundColor,
+            colorScheme: getComputedStyle(body).colorScheme,
+            inputBackground: body.querySelector('.fi-input-wrp')
+                ? getComputedStyle(body.querySelector('.fi-input-wrp')).backgroundColor
+                : null,
+        }));
+
+        assert.equal(colors.colorScheme, theme);
+
+        if (theme === 'dark') {
+            assert.notEqual(colors.background, 'rgb(248, 250, 252)', 'Dark standalone page kept the light background');
+            if (colors.inputBackground !== null) {
+                assert.notEqual(colors.inputBackground, 'rgb(255, 255, 255)', 'Dark registration form kept the light input background');
+            }
+        } else {
+            assert.equal(colors.background, 'rgb(248, 250, 252)');
+            if (colors.inputBackground !== null) {
+                assert.equal(colors.inputBackground, 'rgb(255, 255, 255)');
+            }
+        }
+    }
+
+    async function createWorkspace(name, slug, theme) {
+        if (theme) await assertStandaloneTheme(theme);
         await page.locator('[id="form.name"]').fill(name);
         await page.locator('[id="form.slug"]').fill(slug);
         await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
         await page.waitForURL(`**/admin/workspaces/${slug}/workspace-setup`);
         await page.getByText('Waiting for setup', { exact: true }).waitFor();
+        if (theme) await assertStandaloneTheme(theme);
         php(['tests/Browser/artisan.php', 'queue:work', 'database', '--once', '--sleep=0']);
         await page.waitForURL(`**/admin/workspaces/${slug}`, { timeout: 20000 });
     }
 
-    await createWorkspace('Browser Alpha', 'browser-alpha');
+    await setTheme('light');
+    await createWorkspace('Browser Alpha', 'browser-alpha', 'light');
     await page.locator('.fi-tenant-menu-trigger').click();
     await page.getByRole('link', { name: 'Create workspace' }).click();
-    await createWorkspace('Browser Beta', 'browser-beta');
+    await setTheme('dark');
+    await createWorkspace('Browser Beta', 'browser-beta', 'dark');
     await page.locator('.fi-tenant-menu-trigger').click();
     await page.getByRole('link', { name: 'Browser Alpha', exact: true }).click();
     await page.waitForURL('**/admin/workspaces/browser-alpha');
