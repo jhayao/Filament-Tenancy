@@ -48,7 +48,7 @@ try {
         await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
         await page.waitForURL(`**/admin/workspaces/${slug}/workspace-setup`);
         await page.getByText('Waiting for setup', { exact: true }).waitFor();
-        php(['tests/Browser/artisan.php', 'queue:work', 'database', '--queue=tenant-provisioning', '--once', '--sleep=0']);
+        php(['tests/Browser/artisan.php', 'queue:work', 'database', '--once', '--sleep=0']);
         await page.waitForURL(`**/admin/workspaces/${slug}`, { timeout: 20000 });
     }
 

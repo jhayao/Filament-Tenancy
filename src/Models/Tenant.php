@@ -4,6 +4,7 @@ namespace Liern\FilamentTenancy\Models;
 
 use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Str;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
 use Liern\FilamentTenancy\Relations\WorkspaceUsers;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
@@ -49,5 +50,61 @@ class Tenant extends BaseTenant implements HasName, TenantWithDatabase
     public function getFilamentName(): string
     {
         return $this->name;
+    }
+
+    public function getRouteKey()
+    {
+        if (config('filament-tenancy.identification') !== 'subdomain' || ! config('filament-tenancy.custom_domains.enabled')) {
+            return parent::getRouteKey();
+        }
+
+        $requestHost = strtolower((string) request()->getHost());
+
+        if ($requestHost !== '' && WorkspaceDomain::query()
+            ->where('workspace_id', $this->getKey())
+            ->where('domain', $requestHost)
+            ->whereNotNull('verified_at')
+            ->exists()) {
+            return $requestHost;
+        }
+
+        $centralDomain = strtolower((string) config('filament-tenancy.central_domain'));
+
+        return Str::finish((string) $this->getAttribute('slug'), '.'.$centralDomain);
+    }
+
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if (config('filament-tenancy.identification') !== 'subdomain' || ! config('filament-tenancy.custom_domains.enabled')) {
+            return parent::resolveRouteBinding($value, $field);
+        }
+
+        $host = strtolower(rtrim((string) $value, '.'));
+        $centralDomain = strtolower((string) config('filament-tenancy.central_domain'));
+
+        if ($host === '' || $host === $centralDomain) {
+            return null;
+        }
+
+        if (Str::endsWith($host, '.'.$centralDomain)) {
+            return static::query()->where('slug', Str::beforeLast($host, '.'.$centralDomain))->first();
+        }
+
+        return WorkspaceDomain::query()
+            ->where('domain', $host)
+            ->whereNotNull('verified_at')
+            ->with('workspace')
+            ->first()?->workspace;
+    }
+
+    public function getLogoUrlAttribute(): ?string
+    {
+        $path = $this->getAttribute('logo_path');
+
+        if (blank($path)) {
+            return null;
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk(config('filament-tenancy.profile.logo_disk', 'public'))->url($path);
     }
 }

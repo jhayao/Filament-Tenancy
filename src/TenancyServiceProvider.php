@@ -4,8 +4,15 @@ namespace Liern\FilamentTenancy;
 
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
+use Liern\FilamentTenancy\Http\Controllers\WorkspaceHandoffController;
+use Liern\FilamentTenancy\Commands\ListWorkspaceDomains;
+use Liern\FilamentTenancy\Commands\RemoveWorkspaceDomain;
+use Liern\FilamentTenancy\Commands\PruneWorkspaceHandoffs;
 use Liern\FilamentTenancy\Commands\RetryProvisioning;
+use Liern\FilamentTenancy\Commands\VerifyWorkspaceDomain;
 use Liern\FilamentTenancy\Http\Middleware\ResetWorkspaceContext;
 use Liern\FilamentTenancy\Models\WorkspaceDomain;
 use Liern\FilamentTenancy\Support\TenantModel;
@@ -51,8 +58,24 @@ class TenancyServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'filament-tenancy');
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'filament-tenancy');
 
+        Route::middleware('web')
+            ->get('/lona-tenancy/handoff/{token}', WorkspaceHandoffController::class)
+            ->name('lona-tenancy.handoff');
+
         if ($this->app->runningInConsole()) {
-            $this->commands([RetryProvisioning::class]);
+            $this->commands([
+                ListWorkspaceDomains::class,
+                RemoveWorkspaceDomain::class,
+                PruneWorkspaceHandoffs::class,
+                RetryProvisioning::class,
+                VerifyWorkspaceDomain::class,
+            ]);
+
+            $this->app->booted(function (): void {
+                if ($this->app->bound(Schedule::class)) {
+                    $this->app->make(Schedule::class)->command(PruneWorkspaceHandoffs::class)->hourly();
+                }
+            });
             $this->publishes([__DIR__.'/../config/filament-tenancy.php' => config_path('filament-tenancy.php')], 'filament-tenancy-config');
             $this->publishesMigrations([__DIR__.'/../database/migrations' => database_path('migrations')], 'filament-tenancy-migrations');
             $this->publishes([__DIR__.'/../resources/views' => resource_path('views/vendor/filament-tenancy')], 'filament-tenancy-views');

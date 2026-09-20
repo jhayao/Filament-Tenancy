@@ -4,7 +4,7 @@ A standalone Filament v5 Composer plugin for dedicated database workspaces.
 
 This first version provides workspace onboarding, central users and memberships, Filament's searchable workspace switcher, queued database creation/migrations/optional seeding, a polling setup screen, and an operator retry command. Each workspace has its own database named `tenant_{slug}` and an auto-incrementing integer ID; tenant tables do not need `tenant_id`.
 
-Uses public `stancl/tenancy` v3.10, not the reference plugin's private v4 dependency. Path routing keeps login and workspaces on one origin: `/admin/workspaces/acme`. Subdomains, custom domains, shared databases, database pools, billing, invitations, resource syncing, and automatic database deletion are not included.
+Uses public `stancl/tenancy` v3.10, not the reference plugin's private v4 dependency. Path routing keeps login and workspaces on one origin: `/admin/workspaces/acme`. The package also includes optional owner-managed workspace profiles and verified custom domains for subdomain panels. Shared databases, database pools, billing, invitations, resource syncing, and automatic database deletion are not included.
 
 ## Requirements
 
@@ -117,6 +117,34 @@ Use `withTenantRegistration(null)` (or `registration_page => null`) to remove se
 
 Additional middleware runs after membership/readiness checks and is persistent on Livewire updates. The setup page also runs this middleware, but remains in the central context; middleware should handle that case. Fluent middleware arrays replace the configured list. Hiding the menu or switcher changes navigation only, not authorization.
 
+Enable the workspace profile page with `profile.enabled => true` or the fluent `withTenantProfile()` option. Owners can edit the workspace name, logo, description, email and phone number. Profile fields are stored in the existing workspace `data` JSON column. Logos are stored under a workspace-specific directory on `profile.logo_disk` (the default is the public disk); use a persistent object-storage disk in production when application instances are ephemeral.
+
+### Custom domains on Laravel Cloud and Cloudflare
+
+Custom domains are opt-in and require subdomain identification. Configure the central host, run the published migrations, and enable the feature in the panel:
+
+```php
+// config/filament-tenancy.php
+'identification' => 'subdomain',
+'central_domain' => env('TENANCY_CENTRAL_DOMAIN', 'app.example.com'),
+'custom_domains' => [
+    'enabled' => true,
+],
+```
+
+```php
+TenancyPlugin::make()
+    ->customDomains();
+```
+
+Workspace owners add a hostname from the Custom domains page. The package displays a TXT record at `_lona-verify.<hostname>` and verifies that record before the hostname can identify a workspace. Removing a row immediately disables workspace routing for that hostname. Existing domain rows are left unverified by the additive migration.
+
+The package verifies ownership and resolves an already verified host. It does not call the Laravel Cloud or Cloudflare APIs and does not claim that a hostname has been registered, routed, or issued a certificate. Register each verified hostname in Laravel Cloud's Network settings, then add the DNS records Laravel Cloud provides. If the domain's DNS is hosted by Cloudflare, follow Cloudflare's proxy and SSL requirements for the Laravel Cloud origin. Keep the application behind HTTPS and configure Laravel's trusted proxies for the Cloudflare/Laravel Cloud deployment.
+
+Authentication remains anchored to the central application host. When a user opens a verified custom host without its host-only session cookie, the package sends them through the panel's normal login and MFA/email-verification flow, then issues a one-use handoff valid for 60 seconds. The handoff is bound to the verified workspace, panel, guard, user, target host and browser network/user-agent state; it never accepts an arbitrary return URL. Do not set `SESSION_DOMAIN` to a parent domain shared with customer domains.
+
+See [Laravel Cloud custom domains](https://laravel.com/cloud/docs/domains), [Cloudflare custom hostnames](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/domain-support/create-custom-hostnames/), and [the package custom-domain workflow](https://packstub.dev/docs/filament-tenancy/custom-domains) for the hosting and DNS steps outside this package.
+
 ### Custom tenant model
 
 Set the application-wide `tenant_model` configuration to a concrete subclass of the package model:
@@ -148,7 +176,7 @@ TENANCY_QUEUE_CONNECTION=database
 ```
 
 ```bash
-php artisan queue:work database --queue=tenant-provisioning --timeout=300
+php artisan queue:work database --timeout=300
 php artisan workspaces:retry WORKSPACE_ID
 ```
 

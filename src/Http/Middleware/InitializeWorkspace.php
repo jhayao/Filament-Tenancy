@@ -18,6 +18,11 @@ class InitializeWorkspace
         $user = Filament::auth()->user();
         abort_unless(is_a($tenant, TenantModel::get()) && $user instanceof HasTenants && $user->canAccessTenant($tenant), 404);
 
+        if (config('filament-tenancy.identification') === 'subdomain' && config('filament-tenancy.custom_domains.enabled')) {
+            $hostTenant = app(TenantModel::get())->resolveRouteBinding($request->getHost(), 'slug');
+            abort_unless($hostTenant !== null && $hostTenant->getKey() === $tenant->getKey(), 404);
+        }
+
         // A batched Livewire request must not mix snapshots from different workspaces.
         $requestTenant = request()->attributes->get('liern.workspace');
         abort_if($requestTenant !== null && $requestTenant !== $tenant->getKey(), 409);

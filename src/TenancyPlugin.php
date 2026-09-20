@@ -5,10 +5,13 @@ namespace Liern\FilamentTenancy;
 use Filament\Contracts\Plugin;
 use Filament\Pages\Tenancy\RegisterTenant;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Liern\FilamentTenancy\Http\Middleware\InitializeWorkspace;
+use Liern\FilamentTenancy\Http\Middleware\WorkspaceHandoffMiddleware;
 use Liern\FilamentTenancy\Pages\Provisioning;
 use Liern\FilamentTenancy\Pages\RegisterWorkspace;
 use Liern\FilamentTenancy\Pages\WorkspaceBilling;
+use Liern\FilamentTenancy\Pages\WorkspaceDomains;
 use Liern\FilamentTenancy\Resources\TenantResource;
 use Liern\FilamentTenancy\Support\TenantModel;
 use LogicException;
@@ -53,6 +56,22 @@ class TenancyPlugin implements Plugin
         return $this;
     }
 
+    public function withTenantProfile(bool $enabled = true, ?string $page = null): static
+    {
+        $this->overrides['profile.enabled'] = $enabled;
+        $this->overrides['profile.page'] = $page ?? $this->option('profile.page');
+
+        return $this;
+    }
+
+    public function customDomains(bool $enabled = true, ?string $page = null): static
+    {
+        $this->overrides['custom_domains.enabled'] = $enabled;
+        $this->overrides['custom_domains.page'] = $page ?? $this->option('custom_domains.page');
+
+        return $this;
+    }
+
     public function extraTenantMiddleware(array $middleware): static
     {
         $this->overrides['extra_tenant_middleware'] = $middleware;
@@ -89,6 +108,12 @@ class TenancyPlugin implements Plugin
             throw new LogicException('The workspace registration page must extend '.RegisterTenant::class.' or be null.');
         }
 
+        $customDomainsEnabled = (bool) $this->option('custom_domains.enabled');
+
+        if ($customDomainsEnabled && $this->option('identification') !== 'subdomain') {
+            throw new LogicException('Custom workspace domains require subdomain identification.');
+        }
+
         $panel
             ->tenant(TenantModel::get(), slugAttribute: 'slug')
             ->tenantRegistration($registration)
@@ -98,8 +123,26 @@ class TenancyPlugin implements Plugin
             ->pages([Provisioning::class])
             ->tenantMiddleware([InitializeWorkspace::class, ...$this->option('extra_tenant_middleware')], isPersistent: true);
 
+        if ($customDomainsEnabled) {
+            $panel->middleware([WorkspaceHandoffMiddleware::class], isPersistent: true);
+        }
+
         if ($this->option('identification') === 'subdomain') {
-            $panel->tenantDomain('{tenant:slug}.'.$this->option('central_domain'));
+            if ($customDomainsEnabled) {
+                $panel
+                    ->tenantDomain('{tenant:*}')
+                    ->resolveTenantUsing(function (string $key) {
+                        $tenant = app(TenantModel::get())->resolveRouteBinding($key, 'slug');
+
+                        if ($tenant !== null) {
+                            return $tenant;
+                        }
+
+                        throw (new ModelNotFoundException)->setModel(TenantModel::get(), [$key]);
+                    });
+            } else {
+                $panel->tenantDomain('{tenant:slug}.'.$this->option('central_domain'));
+            }
         } else {
             $panel->tenantRoutePrefix($prefix);
         }
@@ -110,6 +153,16 @@ class TenancyPlugin implements Plugin
 
         if ($this->option('billing.enabled')) {
             $panel->pages([WorkspaceBilling::class]);
+        }
+
+        if ($customDomainsEnabled) {
+            $domainPage = $this->option('custom_domains.page');
+
+            if (! is_string($domainPage) || ! is_subclass_of($domainPage, WorkspaceDomains::class)) {
+                throw new LogicException('The custom domains page must extend '.WorkspaceDomains::class.'.');
+            }
+
+            $panel->pages([$domainPage]);
         }
     }
 

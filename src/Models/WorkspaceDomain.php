@@ -14,7 +14,18 @@ class WorkspaceDomain extends Model implements Domain
     protected $fillable = [
         'domain',
         'workspace_id',
+        'verification_token',
+        'verified_at',
     ];
+
+    protected $casts = [
+        'verified_at' => 'datetime',
+    ];
+
+    public function getConnectionName()
+    {
+        return config('filament-tenancy.central_connection');
+    }
 
     public function workspace(): BelongsTo
     {
@@ -34,5 +45,20 @@ class WorkspaceDomain extends Model implements Domain
     public function tenant()
     {
         return $this->workspace();
+    }
+
+    public function isVerified(): bool
+    {
+        return $this->verified_at !== null;
+    }
+
+    public function verificationRecordName(): string
+    {
+        return config('filament-tenancy.custom_domains.verification_prefix', '_lona-verify.') . $this->domain;
+    }
+
+    public function verificationRecordValue(): string
+    {
+        return (string) $this->verification_token;
     }
 }

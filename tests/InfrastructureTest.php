@@ -62,7 +62,7 @@ class InfrastructureTest extends TestCase
 
     private function work(): void
     {
-        $this->artisan('queue:work', ['connection' => 'database', '--queue' => 'tenant-provisioning,default', '--once' => true, '--sleep' => 0])->assertSuccessful();
+        $this->artisan('queue:work', ['connection' => 'database', '--queue' => 'default', '--once' => true, '--sleep' => 0])->assertSuccessful();
     }
 
     public function test_database_worker_provisions_and_sessions_remain_central(): void
@@ -71,6 +71,7 @@ class InfrastructureTest extends TestCase
         $workspace = app(CreateWorkspace::class)->create($owner, ['name' => 'Acme', 'slug' => 'acme']);
         $this->assertSame(ProvisioningStatus::Pending, $workspace->fresh()->status);
         $this->assertSame(1, DB::table('jobs')->count());
+        $this->assertSame('default', DB::table('jobs')->value('queue'));
         $statuses = [];
         Event::listen(TenancyInitialized::class, function ($event) use (&$statuses) {
             $statuses[] = $event->tenancy->tenant->fresh()->status;
