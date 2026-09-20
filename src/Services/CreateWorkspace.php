@@ -9,6 +9,7 @@ use Illuminate\Validation\Rule;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
 use Liern\FilamentTenancy\Jobs\ProvisionWorkspace;
 use Liern\FilamentTenancy\Models\Tenant;
+use Liern\FilamentTenancy\Support\DatabasePoolAllocator;
 use Liern\FilamentTenancy\Support\TenantModel;
 
 class CreateWorkspace
@@ -21,12 +22,10 @@ class CreateWorkspace
         ])->validate();
 
         return DB::connection(config('filament-tenancy.central_connection'))->transaction(function () use ($owner, $validated) {
-            $pool = config('filament-tenancy.database_pool', []);
             $extraData = [];
 
-            if (! empty($pool)) {
-                // Simple random allocation, can be expanded to round-robin or capacity-based
-                $extraData['tenancy_db_connection'] = $pool[array_rand($pool)];
+            if ($connection = app(DatabasePoolAllocator::class)->allocate()) {
+                $extraData['tenancy_db_connection'] = $connection;
             }
 
             $tenant = TenantModel::get()::create([...$validated, ...$extraData, 'status' => ProvisioningStatus::Pending]);

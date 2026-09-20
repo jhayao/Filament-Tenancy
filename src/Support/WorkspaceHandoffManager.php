@@ -31,7 +31,7 @@ class WorkspaceHandoffManager
             'panel_id' => $panel->getId(),
             'target_host' => $domain->domain,
             'browser_hash' => $this->browserHash($request),
-            'expires_at' => now()->addSeconds(60),
+            'expires_at' => now()->addSeconds(min(max((int) config('filament-tenancy.custom_domains.handoff_ttl', 60), 1), 120)),
         ]);
 
         return $token;
@@ -74,6 +74,6 @@ class WorkspaceHandoffManager
 
     public function url(string $token, string $host, Request $request): string
     {
-        return $request->getScheme().'://'.$host.'/lona-tenancy/handoff/'.$token;
+        return $request->getScheme().'://'.$host.'/'.trim((string) config('filament-tenancy.custom_domains.handoff_path', 'lona-tenancy/handoff'), '/').'/'.$token;
     }
 }

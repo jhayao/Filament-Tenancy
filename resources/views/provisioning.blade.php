@@ -16,6 +16,9 @@
             <button class="lw-primary-action" type="button" wire:click="retryProvisioning">
                 {{ __('filament-tenancy::tenancy.retry') }}
             </button>
+            @if (filled($supportUrl))
+                <p class="mt-4"><a class="lw-secondary-action" href="{{ $supportUrl }}">{{ __('filament-tenancy::tenancy.contact_support') }}</a></p>
+            @endif
         </div>
     @else
         <div class="lw-provisioning-state" wire:poll.3s="checkStatus" role="status" aria-live="polite" aria-busy="true">

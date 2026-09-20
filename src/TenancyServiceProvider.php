@@ -2,25 +2,30 @@
 
 namespace Liern\FilamentTenancy;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
-use Liern\FilamentTenancy\Http\Controllers\WorkspaceHandoffController;
+use Liern\FilamentTenancy\Commands\DatabasePoolStatus;
 use Liern\FilamentTenancy\Commands\ListWorkspaceDomains;
-use Liern\FilamentTenancy\Commands\RemoveWorkspaceDomain;
 use Liern\FilamentTenancy\Commands\PruneWorkspaceHandoffs;
+use Liern\FilamentTenancy\Commands\RemoveWorkspaceDomain;
 use Liern\FilamentTenancy\Commands\RetryProvisioning;
 use Liern\FilamentTenancy\Commands\VerifyWorkspaceDomain;
+use Liern\FilamentTenancy\Http\Controllers\WorkspaceHandoffController;
+use Liern\FilamentTenancy\Http\Middleware\ManageWorkspaceSessionCookie;
 use Liern\FilamentTenancy\Http\Middleware\ResetWorkspaceContext;
 use Liern\FilamentTenancy\Models\WorkspaceDomain;
+use Liern\FilamentTenancy\Support\DatabasePoolAllocator;
 use Liern\FilamentTenancy\Support\TenantModel;
 use Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper;
 use Stancl\Tenancy\DatabaseConfig;
 use Stancl\Tenancy\Events;
+use Stancl\Tenancy\Events\SyncedResourceSaved;
 use Stancl\Tenancy\Listeners;
+use Stancl\Tenancy\Listeners\UpdateSyncedResource;
 
 class TenancyServiceProvider extends ServiceProvider
 {
@@ -31,9 +36,17 @@ class TenancyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if (config('filament-tenancy.run_migrations', false)) {
+            $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        }
+
         DatabaseConfig::generateDatabaseNamesUsing(
             fn ($tenant): string => config('filament-tenancy.database_name_prefix', 'tenant_').$tenant->getAttribute('slug')
         );
+
+        app(DatabasePoolAllocator::class)->validate();
+
+        $this->registerResourceSyncing();
 
         config([
             'tenancy.tenant_model' => TenantModel::get(),
@@ -53,18 +66,21 @@ class TenancyServiceProvider extends ServiceProvider
         Event::listen(Events\TenancyEnded::class, Listeners\RevertToCentralContext::class);
 
         // Outer HTTP middleware also surrounds Livewire's synthetic middleware pass.
-        $this->app->make(Kernel::class)->pushMiddleware(ResetWorkspaceContext::class);
+        $kernel = $this->app->make(Kernel::class);
+        $kernel->pushMiddleware(ManageWorkspaceSessionCookie::class);
+        $kernel->pushMiddleware(ResetWorkspaceContext::class);
 
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'filament-tenancy');
         $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'filament-tenancy');
 
         Route::middleware('web')
-            ->get('/lona-tenancy/handoff/{token}', WorkspaceHandoffController::class)
+            ->get('/'.trim((string) config('filament-tenancy.custom_domains.handoff_path', 'lona-tenancy/handoff'), '/').'/{token}', WorkspaceHandoffController::class)
             ->name('lona-tenancy.handoff');
 
         if ($this->app->runningInConsole()) {
             $this->commands([
                 ListWorkspaceDomains::class,
+                DatabasePoolStatus::class,
                 RemoveWorkspaceDomain::class,
                 PruneWorkspaceHandoffs::class,
                 RetryProvisioning::class,
@@ -80,5 +96,22 @@ class TenancyServiceProvider extends ServiceProvider
             $this->publishesMigrations([__DIR__.'/../database/migrations' => database_path('migrations')], 'filament-tenancy-migrations');
             $this->publishes([__DIR__.'/../resources/views' => resource_path('views/vendor/filament-tenancy')], 'filament-tenancy-views');
         }
+    }
+
+    protected function registerResourceSyncing(): void
+    {
+        $syncing = config('filament-tenancy.resource_syncing', []);
+        if (! is_array($syncing) || ! ($syncing['enabled'] ?? false)) {
+            return;
+        }
+
+        foreach ((array) ($syncing['pairs'] ?? []) as $central => $tenant) {
+            if (! is_string($central) || ! is_string($tenant) || ! class_exists($central) || ! class_exists($tenant)) {
+                throw new \LogicException('Resource syncing pairs must map existing central model classes to existing tenant model classes.');
+            }
+        }
+
+        UpdateSyncedResource::$shouldQueue = (bool) ($syncing['queue'] ?? false);
+        Event::listen(SyncedResourceSaved::class, UpdateSyncedResource::class);
     }
 }

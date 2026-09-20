@@ -18,6 +18,7 @@ return [
     'retry' => 'Retry provisioning',
     'wait_help' => 'We are preparing your workspace. You can continue when setup is complete.',
     'failed_help' => 'Setup could not finish. Please contact your administrator to retry.',
+    'contact_support' => 'Contact support',
     'profile' => [
         'label' => 'Workspace profile',
         'details' => 'Workspace details',

@@ -42,6 +42,7 @@ class Provisioning extends Page
             'workspaceName' => $tenant->name,
             'status' => $tenant->status,
             'dashboardUrl' => Filament::getUrl($tenant),
+            'supportUrl' => config('filament-tenancy.support_url'),
         ];
     }
 
@@ -52,7 +53,11 @@ class Provisioning extends Page
 
     public function checkStatus(): void
     {
-        $this->getWorkspace();
+        $tenant = $this->getWorkspace();
+
+        if ($tenant->status === ProvisioningStatus::Ready) {
+            $this->redirect(Filament::getUrl($tenant));
+        }
     }
 
     public function retryProvisioning(): void

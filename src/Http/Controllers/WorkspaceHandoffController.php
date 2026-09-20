@@ -4,15 +4,21 @@ namespace Liern\FilamentTenancy\Http\Controllers;
 
 use Filament\Facades\Filament;
 use Illuminate\Http\Request;
-use RuntimeException;
 use Liern\FilamentTenancy\Support\TenantModel;
 use Liern\FilamentTenancy\Support\WorkspaceHandoffManager;
+use RuntimeException;
 
 class WorkspaceHandoffController
 {
     public function __invoke(Request $request, string $token)
     {
         abort_unless(config('filament-tenancy.custom_domains.enabled'), 404);
+
+        if (config('filament-tenancy.custom_domains.interstitial', false) && ! $request->boolean('confirm')) {
+            return response()->view('filament-tenancy::handoff', [
+                'continueUrl' => $request->fullUrlWithQuery(['confirm' => 1]),
+            ]);
+        }
 
         try {
             $handoff = app(WorkspaceHandoffManager::class)->consume($token, $request);

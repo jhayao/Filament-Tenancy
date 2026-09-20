@@ -2,9 +2,9 @@
 
 A standalone Filament v5 Composer plugin for dedicated database workspaces.
 
-This first version provides workspace onboarding, central users and memberships, Filament's searchable workspace switcher, queued database creation/migrations/optional seeding, a polling setup screen, and an operator retry command. Each workspace has its own database named `tenant_{slug}` and an auto-incrementing integer ID; tenant tables do not need `tenant_id`.
+This package provides workspace onboarding, central users and memberships, Filament's searchable workspace switcher, queued database creation/migrations/optional seeding, shared or dedicated database strategies, a polling setup screen, custom domains, profiles, database pools, billing-provider wiring, and operator commands. Each dedicated workspace has its own database named `tenant_{slug}` and an auto-incrementing integer ID; tenant tables do not need `tenant_id`.
 
-Uses public `stancl/tenancy` v3.10, not the reference plugin's private v4 dependency. Path routing keeps login and workspaces on one origin: `/admin/workspaces/acme`. The package also includes optional owner-managed workspace profiles and verified custom domains for subdomain panels. Shared databases, database pools, billing, invitations, resource syncing, and automatic database deletion are not included.
+Uses public `stancl/tenancy` v3.10, not a private tenancy dependency. Path routing keeps login and workspaces on one origin: `/admin/workspaces/acme`; subdomain routing is available with `identification => 'subdomain'`. The package keeps the Lona namespace and implements the documented behavior independently.
 
 ## Requirements
 
@@ -36,6 +36,8 @@ php artisan vendor:publish --tag=filament-tenancy-migrations
 php artisan migrate
 mkdir -p database/migrations/tenant
 ```
+
+Central migrations are published by default for existing applications. Set `run_migrations => true` only when the package should load its bundled central migrations automatically; do not enable that option while also publishing the same migrations.
 
 Migrations are explicitly published, not automatically loaded in production. Keep users, memberships, sessions, jobs, failed jobs, and database cache tables in central migrations. Put only workspace business tables in `database/migrations/tenant`. Do not copy the central users migration there.
 
@@ -106,16 +108,32 @@ TenancyPlugin::make()
 
 | Configuration key | Fluent method | Default |
 | --- | --- | --- |
+| `run_migrations` | config only | `false` |
+| `database_strategy` | `databaseStrategy('dedicated' | 'shared')` | `dedicated` |
+| `central_domain` | `centralDomain('example.com')` | host from `APP_URL` |
+| `identification` | `identification('path' | 'subdomain')` | `path` |
 | `route_prefix` | `routePrefix('teams')` | `workspaces` |
+| `onboarding.enabled`, `onboarding.page` | `withTenantRegistration(Page::class)` | enabled |
 | `registration_page` | `withTenantRegistration(Page::class)` | `RegisterWorkspace::class` |
 | `menu.enabled` | `withTenantMenu(false)` | `true` |
 | `menu.switcher_enabled` | `withTenantSwitcher(false)` | `true` |
 | `menu.searchable` | `searchableTenantMenu(false)` | `true` |
+| `menu.items` | `tenantMenuItems([...])` | `[]` |
+| `ownership_relationship` | `ownershipRelationship('team')` | `null` |
+| `scope_resources_to_tenant` | `scopeResourcesToTenant()` | follows database strategy |
+| `profile.*` | `withTenantProfile()` | enabled by published config |
+| `billing.*` | `withTenantBilling(...)` | disabled |
+| `database_pool.*` | `databasePool([...])` | disabled |
+| `resource_syncing.*` | `syncResources([...])` | disabled |
 | `extra_tenant_middleware` | `extraTenantMiddleware([...])` | `[]` |
 
 Use `withTenantRegistration(null)` (or `registration_page => null`) to remove self-service registration and its menu entry. Existing memberships remain usable. A replacement registration page must extend Filament's `RegisterTenant`; extend this package's `RegisterWorkspace` to retain its provisioning behavior. Route prefixes must be a single lowercase URL segment, such as `teams` or `client-workspaces`.
 
 Additional middleware runs after membership/readiness checks and is persistent on Livewire updates. The setup page also runs this middleware, but remains in the central context; middleware should handle that case. Fluent middleware arrays replace the configured list. Hiding the menu or switcher changes navigation only, not authorization.
+
+The equivalent nested key is `middleware.extra`. `database_strategy => 'dedicated'` uses connection isolation; `database_strategy => 'shared'` uses the `workspace_id` relationship scope for resources that extend `TenantResource`. Set `scope_resources_to_tenant` explicitly when the strategy default is not appropriate.
+
+Use `ownershipRelationship('team')` when tenant-owned resource models expose a relationship other than Filament's default. Menu actions can be supplied with `tenantMenuItems([...])`; closures and action objects should be configured fluently rather than placed in cached config.
 
 Enable the workspace profile page with `profile.enabled => true` or the fluent `withTenantProfile()` option. Owners can edit the workspace name, logo, description, email and phone number. Profile fields are stored in the existing workspace `data` JSON column. Logos are stored under a workspace-specific directory on `profile.logo_disk` (the default is the public disk); use a persistent object-storage disk in production when application instances are ephemeral.
 
@@ -145,6 +163,8 @@ Authentication remains anchored to the central application host. When a user ope
 
 See [Laravel Cloud custom domains](https://laravel.com/cloud/docs/domains), [Cloudflare custom hostnames](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/domain-support/create-custom-hostnames/), and [the package custom-domain workflow](https://packstub.dev/docs/filament-tenancy/custom-domains) for the hosting and DNS steps outside this package.
 
+For custom-domain handoff behavior, `custom_domains.handoff_ttl` is clamped to 1–120 seconds, `custom_domains.handoff_path` controls the exchange endpoint, and `custom_domains.interstitial` shows a confirmation page before the one-use handoff is consumed. Set `manage_session_cookie => true` in subdomain mode to share the session cookie across the central host and its tenant subdomains while keeping custom domains host-only.
+
 ### Custom tenant model
 
 Set the application-wide `tenant_model` configuration to a concrete subclass of the package model:
@@ -166,6 +186,25 @@ class Organization extends \Liern\FilamentTenancy\Models\Tenant
 The same model is used by Filament, Stancl, memberships, validation, provisioning, retries and the setup page. It is configured globally so workers do not depend on a panel being booted. Keep the inherited `workspaces` / `workspace_user` schema, integer workspace IDs, status cast and central connection behavior. Custom tables and alternate key layouts are outside this extension contract. Register authorization policies for your configured model.
 
 Existing published configuration files can omit the new keys: defaults preserve `/workspaces/{slug}`, the existing registration page and searchable switcher. No schema migration is required. PostgreSQL membership reads explicitly cast application-owned user keys to text to match the existing string membership keys.
+
+### Database pools, billing and resource syncing
+
+Database pools are disabled by default. Configure ordinary `database.php` connection names and choose `least-tenants`, `round-robin`, or `weighted` placement:
+
+```php
+'database_pool' => [
+    'enabled' => true,
+    'connections' => ['tenant_pool_1', 'tenant_pool_2'],
+    'strategy' => 'least-tenants',
+    'weights' => [],
+],
+```
+
+The fluent equivalent is `databasePool(['tenant_pool_1', 'tenant_pool_2'], strategy: 'least-tenants')`. Pool configuration is validated when the provider boots. Inspect placement with `php artisan tenants:pool`; the original flat connection-list format remains accepted for compatibility.
+
+Billing delegates to Filament's `BillingProvider` contract. Use `withTenantBilling(Provider::class, routeSlug: 'billing', required: true)` or configure `billing.provider`, `billing.route_slug`, and `billing.required`. A required provider must return a non-empty subscribed middleware class.
+
+Resource syncing is opt-in and uses Stancl's `Syncable`/`SyncMaster` contracts with the `SyncsToTenants` and `IsTenantResource` helpers. Configure central-to-tenant model pairs under `resource_syncing.pairs`, or call `syncResources([...])`; add `queueResourceSync()` when fan-out should run through the queue. Models remain responsible for implementing the contracts and declaring their synced attributes.
 
 ### Queue and retries
 
