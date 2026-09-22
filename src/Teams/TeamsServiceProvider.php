@@ -48,6 +48,7 @@ class TeamsServiceProvider extends ServiceProvider
             $this->publishes([__DIR__.'/../../resources/views' => resource_path('views/vendor/filament-tenancy')], 'filament-tenancy-views');
             $this->publishes([__DIR__.'/../../config/teams.php' => config_path('teams.php')], 'filament-tenancy-teams-config');
             $this->publishesMigrations([__DIR__.'/../../database/optional-migrations' => database_path('migrations')], 'filament-tenancy-notifications-migration');
+            $this->publishesMigrations([__DIR__.'/../../database/optional-migrations/2026_09_22_000000_fix_postgres_notification_data_type.php' => database_path('migrations/2026_09_22_000000_fix_postgres_notification_data_type.php')], 'filament-tenancy-notifications-upgrade');
             $this->publishes([__DIR__.'/../../resources/lang' => lang_path('vendor/filament-tenancy')], 'filament-tenancy-translations');
         }
     }

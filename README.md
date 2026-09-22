@@ -236,7 +236,16 @@ php artisan vendor:publish --tag=filament-tenancy-notifications-migration
 php artisan migrate
 ```
 
-The notification migration leaves an existing `notifications` table untouched. For UUID/ULID users, its `notifiable_id` column must support your user keys. The package writes notifications centrally and enables Filament's notification bell. A central notification relationship is supplied dynamically when the configured user model has none; a host-provided relationship is preserved and should use the central connection.
+The notification creation migration leaves an existing `notifications` table untouched. New PostgreSQL tables use a `json` data column, as required by Filament's notification filters; other database drivers retain `text`. The included repair migration converts existing PostgreSQL notification payloads to `json`, preserving their data and metadata, and skips tables already using `json` or `jsonb`. For UUID/ULID users, the `notifiable_id` column must support your user keys. The package writes notifications centrally and enables Filament's notification bell. A central notification relationship is supplied dynamically when the configured user model has none; a host-provided relationship is preserved and should use the central connection.
+
+If notifications were already migrated with v0.5.0, updating the package alone does not change the existing column. After installing the package version containing this fix, publish only the repair migration and run it in the host application:
+
+```bash
+php artisan vendor:publish --tag=filament-tenancy-notifications-upgrade
+php artisan migrate
+```
+
+The repair uses `teams.connection`, falling back to `filament-tenancy.central_connection`, and never runs automatically on an HTTP request. It skips non-PostgreSQL databases and missing notification tables/columns. Invalid JSON causes the conversion to fail atomically; repair the affected payloads in your application and rerun the migration rather than deleting notifications. Rolling back the migration or package code keeps the compatible JSON column intact. No vendor edits or notification-table recreation are needed.
 
 ```php
 TenancyPlugin::make()->withMembers();
