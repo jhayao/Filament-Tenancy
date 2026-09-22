@@ -18,7 +18,7 @@ This repository is a package, not a runnable Laravel application, and is not pub
 
 ```bash
 composer config repositories.lona-tenancy vcs https://github.com/jhayao/lona-tenancy.git
-composer require jhayao/lona-tenancy:^0.3
+composer require jhayao/lona-tenancy:^0.5
 ```
 
 To install the current development branch instead, use `dev-main`:
