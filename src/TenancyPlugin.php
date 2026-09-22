@@ -2,6 +2,9 @@
 
 namespace Liern\FilamentTenancy;
 
+use BezhanSalleh\FilamentShield\Resources\Roles\RoleResource;
+use Filament\Auth\Pages\Login;
+use Filament\Auth\Pages\Register;
 use Filament\Billing\Providers\Contracts\BillingProvider;
 use Filament\Contracts\Plugin;
 use Filament\Pages\Tenancy\RegisterTenant;
@@ -10,12 +13,16 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Event;
 use Liern\FilamentTenancy\Billing\NullBillingProvider;
 use Liern\FilamentTenancy\Http\Middleware\InitializeWorkspace;
+use Liern\FilamentTenancy\Http\Middleware\SetTeamPermissions;
 use Liern\FilamentTenancy\Http\Middleware\WorkspaceHandoffMiddleware;
+use Liern\FilamentTenancy\Pages\Members;
 use Liern\FilamentTenancy\Pages\Provisioning;
 use Liern\FilamentTenancy\Pages\RegisterWorkspace;
 use Liern\FilamentTenancy\Pages\WorkspaceDomains;
 use Liern\FilamentTenancy\Resources\TenantResource;
 use Liern\FilamentTenancy\Support\TenantModel;
+use Liern\FilamentTenancy\Teams\Shield;
+use Liern\FilamentTenancy\Teams\Teams;
 use LogicException;
 use ReflectionClass;
 use Stancl\Tenancy\Events\SyncedResourceSaved;
@@ -24,6 +31,51 @@ use Stancl\Tenancy\Listeners\UpdateSyncedResource;
 class TenancyPlugin implements Plugin
 {
     protected array $overrides = [];
+
+    public function withMembers(bool $enabled = true): static
+    {
+        $this->overrides['teams.enabled'] = $enabled;
+
+        return $this;
+    }
+
+    public function withFilamentShield(bool $enabled = true): static
+    {
+        $this->overrides['teams.shield.enabled'] = $enabled;
+        $this->withMembers();
+
+        return $this;
+    }
+
+    public function useFilamentTenancy(string $model, string $pivot = 'tenant_user', string $teamKey = 'tenant_id'): static
+    {
+        $this->overrides['teams.external'] = true;
+        $this->overrides['teams.model'] = $model;
+        $this->overrides['teams.pivot'] = $pivot;
+        $this->overrides['teams.team_key'] = $teamKey;
+        $this->overrides['teams.owner_column'] = null;
+        $this->withMembers();
+
+        return $this;
+    }
+
+    protected function registerTeams(Panel $panel): void
+    {
+        if (! config('teams.enabled')) {
+            return;
+        }
+        app(Teams::class)->registerNotificationRelation();
+        $panel->databaseNotifications();
+        $panel->pages([Members::class]);
+        $panel->tenantMiddleware([SetTeamPermissions::class], isPersistent: true);
+        // Preserve host authentication overrides; provide explicit extension hooks for them.
+        if ($panel->getLoginRouteAction() === Login::class) {
+            $panel->login(\Liern\FilamentTenancy\Teams\Auth\Login::class);
+        }
+        if ($panel->getRegistrationRouteAction() === Register::class) {
+            $panel->registration(\Liern\FilamentTenancy\Teams\Auth\Register::class);
+        }
+    }
 
     public function routePrefix(string $prefix): static
     {
@@ -220,6 +272,18 @@ class TenancyPlugin implements Plugin
 
     public function register(Panel $panel): void
     {
+        foreach ($this->overrides as $key => $value) {
+            if (str_starts_with($key, 'teams.')) {
+                config([$key => $value]);
+            }
+        }
+        if (config('teams.external')) {
+            $panel->tenant(config('teams.model'));
+            $this->registerTeams($panel);
+
+            return;
+        }
+
         if (array_key_exists('database_strategy', $this->overrides)) {
             config(['filament-tenancy.database_strategy' => $this->overrides['database_strategy']]);
         }
@@ -298,6 +362,8 @@ class TenancyPlugin implements Plugin
             ->pages([Provisioning::class])
             ->tenantMiddleware([InitializeWorkspace::class, ...$this->extraMiddleware()], isPersistent: true);
 
+        $this->registerTeams($panel);
+
         if ($items = $this->option('menu.items')) {
             $panel->tenantMenuItems($items);
         }
@@ -361,8 +427,16 @@ class TenancyPlugin implements Plugin
 
     public function boot(Panel $panel): void
     {
+        app(Shield::class)->validate();
+        if (config('teams.external')) {
+            return;
+        }
+
         // Never mutate Resource's inherited static flag: it can affect other panels.
         foreach ($panel->getResources() as $resource) {
+            if (config('teams.shield.enabled') && is_a($resource, RoleResource::class, true)) {
+                continue;
+            }
             if ($resource::isScopedToTenant() && ! is_subclass_of($resource, TenantResource::class)) {
                 throw new LogicException("{$resource} must extend Liern\\FilamentTenancy\\Resources\\TenantResource or declare protected static bool \$isScopedToTenant = false.");
             }

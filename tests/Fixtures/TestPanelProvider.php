@@ -2,6 +2,7 @@
 
 namespace Liern\FilamentTenancy\Tests\Fixtures;
 
+use Filament\Auth\Pages\Register;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages\Dashboard;
@@ -19,6 +20,7 @@ class TestPanelProvider extends PanelProvider
     public function panel(Panel $panel): Panel
     {
         return $panel->default()->id('admin')->path('admin')->login()
+            ->registration(config('teams.enabled') ? Register::class : null)
             ->pages([Dashboard::class])
             ->resources([Notes\NoteResource::class])
             ->middleware([EncryptCookies::class, AddQueuedCookiesToResponse::class, StartSession::class, ShareErrorsFromSession::class, SubstituteBindings::class, DispatchServingFilamentEvent::class])

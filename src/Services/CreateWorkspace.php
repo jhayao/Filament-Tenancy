@@ -11,6 +11,7 @@ use Liern\FilamentTenancy\Jobs\ProvisionWorkspace;
 use Liern\FilamentTenancy\Models\Tenant;
 use Liern\FilamentTenancy\Support\DatabasePoolAllocator;
 use Liern\FilamentTenancy\Support\TenantModel;
+use Liern\FilamentTenancy\Teams\Teams;
 
 class CreateWorkspace
 {
@@ -29,7 +30,11 @@ class CreateWorkspace
             }
 
             $tenant = TenantModel::get()::create([...$validated, ...$extraData, 'status' => ProvisioningStatus::Pending]);
-            $tenant->users()->attach($owner->getKey(), ['is_owner' => true]);
+            if (config('teams.enabled')) {
+                app(Teams::class)->initializeOwner($tenant, $owner);
+            } else {
+                $tenant->users()->attach($owner->getKey(), ['is_owner' => true]);
+            }
             ProvisionWorkspace::dispatch($tenant->getKey())->afterCommit();
 
             return $tenant;

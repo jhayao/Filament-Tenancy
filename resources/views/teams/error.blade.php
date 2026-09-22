@@ -1,0 +1,1 @@
+<!doctype html><html lang="{{ app()->getLocale() }}"><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ __('filament-tenancy::teams.invitation') }}</title></head><body><p role="alert">{{ $message }}</p></body></html>

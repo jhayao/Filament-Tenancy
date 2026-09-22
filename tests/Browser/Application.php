@@ -50,11 +50,14 @@ class Application extends \Orchestra\Testbench\Foundation\Application
         $app->useDatabasePath($directory);
         $app->usePublicPath($directory.'/public');
         $app['config']->set([
+            'teams.enabled' => true,
+            'mail.default' => 'log',
             'app.key' => 'base64:'.base64_encode(str_repeat('b', 32)),
             'app.url' => getenv('TENANCY_BROWSER_URL') ?: 'http://127.0.0.1:8765',
             'database.default' => 'central',
             'database.connections.central' => ['driver' => 'sqlite', 'database' => $directory.'/central.sqlite', 'prefix' => '', 'foreign_key_constraints' => true],
             'filament-tenancy.central_connection' => 'central',
+            'filament-tenancy.central_domain' => parse_url(getenv('TENANCY_BROWSER_URL') ?: 'http://127.0.0.1:8765', PHP_URL_HOST),
             'filament-tenancy.user_model' => User::class,
             'filament-tenancy.queue_connection' => 'database',
             'filament-tenancy.migration_path' => dirname(__DIR__).'/Fixtures/migrations',

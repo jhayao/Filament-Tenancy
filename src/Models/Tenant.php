@@ -4,9 +4,11 @@ namespace Liern\FilamentTenancy\Models;
 
 use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
 use Liern\FilamentTenancy\Relations\WorkspaceUsers;
+use Liern\FilamentTenancy\Teams\Teams;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
@@ -41,6 +43,10 @@ class Tenant extends BaseTenant implements HasName, TenantWithDatabase
 
     public function users(): BelongsToMany
     {
+        if (config('teams.enabled')) {
+            return app(Teams::class)->members($this);
+        }
+
         $user = $this->newRelatedInstance(config('filament-tenancy.user_model'));
 
         return (new WorkspaceUsers($user->newQuery(), $this, 'workspace_user', 'workspace_id', 'user_id', $this->getKeyName(), $user->getKeyName(), 'users'))
@@ -105,6 +111,6 @@ class Tenant extends BaseTenant implements HasName, TenantWithDatabase
             return null;
         }
 
-        return \Illuminate\Support\Facades\Storage::disk(config('filament-tenancy.profile.logo_disk', 'public'))->url($path);
+        return Storage::disk(config('filament-tenancy.profile.logo_disk', 'public'))->url($path);
     }
 }

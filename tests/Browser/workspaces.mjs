@@ -99,8 +99,35 @@ try {
     await page.locator('.fi-tenant-menu-trigger').click();
     await page.getByRole('link', { name: 'Browser Beta', exact: true }).click();
     await page.waitForURL('**/admin/workspaces/browser-beta');
+    await page.goto(`${baseURL}/admin/workspaces/browser-beta/members`);
+    await page.getByRole('button', { name: 'Invite members', exact: true }).click();
+    await page.getByLabel('Email addresses').fill('invited@example.test');
+    await page.getByRole('button', { name: 'Submit', exact: true }).click();
+    await page.getByText('invited@example.test · member', { exact: true }).waitFor();
+    const invitationURL = php(['tests/Browser/invitation.php']).trim();
+    const guestContext = await browser.newContext();
+    const guest = await guestContext.newPage();
+    page = guest;
+    guest.setDefaultTimeout(15000);
+    guest.on('pageerror', (error) => errors.push(error.message));
+    await guest.goto(invitationURL);
+    await guest.waitForURL('**/admin/login');
+    assert.equal(await guest.getByLabel('Email address').inputValue(), 'invited@example.test');
+    assert.equal(await guest.getByLabel('Email address').getAttribute('readonly'), 'readonly');
+    await guest.getByRole('link', { name: 'sign up' }).click();
+    await guest.getByLabel('Name', { exact: false }).fill('Invited Member');
+    assert.equal(await guest.getByLabel('Email address').inputValue(), 'invited@example.test');
+    await guest.locator('[id="form.password"]').fill('invitation-password');
+    await guest.getByLabel('Confirm password').fill('invitation-password');
+    await guest.getByRole('button', { name: 'Sign up', exact: true }).click();
+    await guest.waitForURL('**/admin/workspaces/browser-beta');
+    await guest.waitForLoadState('networkidle');
+    await guest.goto(`${baseURL}/admin/workspaces/browser-beta/members`);
+    await guest.getByText('Invited Member', { exact: true }).waitFor();
+    assert.equal(await guest.getByRole('button', { name: 'Invite members', exact: true }).count(), 0);
+    await guestContext.close();
     assert.deepEqual(errors, [], 'Browser JavaScript errors');
-    console.log('Browser flow passed: login, two queued workspace registrations, polling, and switching.');
+    console.log('Browser flow passed: workspace provisioning/switching and invitation → locked-email registration → membership.');
 } catch (error) {
     if (page) {
         console.error((await page.locator('body').innerText()).slice(0, 5000));

@@ -10,13 +10,36 @@
         "stancl/tenancy": "^3.10"
     },
     "require-dev": {
+        "bezhansalleh/filament-shield": "^4.0",
+        "laravel/pint": "^1.0",
         "orchestra/testbench": "^10.0|^11.0",
-        "phpunit/phpunit": "^11.5|^12.0",
-        "laravel/pint": "^1.0"
+        "phpunit/phpunit": "^11.5|^12.0"
     },
-    "autoload": {"psr-4": {"Liern\\FilamentTenancy\\": "src/"}},
-    "autoload-dev": {"psr-4": {"Liern\\FilamentTenancy\\Tests\\": "tests/"}},
-    "extra": {"laravel": {"providers": ["Liern\\FilamentTenancy\\TenancyServiceProvider"]}},
-    "scripts": {"test": "phpunit", "format": "pint"},
-    "config": {"sort-packages": true}
+    "autoload": {
+        "psr-4": {
+            "Liern\\FilamentTenancy\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Liern\\FilamentTenancy\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Liern\\FilamentTenancy\\TenancyServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "format": "pint"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "suggest": {
+        "bezhansalleh/filament-shield": "Optional team-scoped role and permission integration (^4.0)."
+    }
 }

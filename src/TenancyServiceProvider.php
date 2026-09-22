@@ -19,6 +19,7 @@ use Liern\FilamentTenancy\Http\Middleware\ResetWorkspaceContext;
 use Liern\FilamentTenancy\Models\WorkspaceDomain;
 use Liern\FilamentTenancy\Support\DatabasePoolAllocator;
 use Liern\FilamentTenancy\Support\TenantModel;
+use Liern\FilamentTenancy\Teams\TeamsServiceProvider;
 use Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper;
 use Stancl\Tenancy\DatabaseConfig;
@@ -32,10 +33,18 @@ class TenancyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->replaceConfigRecursivelyFrom(__DIR__.'/../config/filament-tenancy.php', 'filament-tenancy');
+        $this->app->register(TeamsServiceProvider::class);
     }
 
     public function boot(): void
     {
+        if (config('teams.external')) {
+            $this->loadViewsFrom(__DIR__.'/../resources/views', 'filament-tenancy');
+            $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'filament-tenancy');
+
+            return;
+        }
+
         if (config('filament-tenancy.run_migrations', false)) {
             $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         }

@@ -225,6 +225,146 @@ Retries reuse the existing database and run outstanding migrations. Ready worksp
 
 Setup failures remain closed to business resources. The browser shows a generic failure message; exceptions go through Laravel's normal worker logging/failed-job handling, without showing credentials or raw SQL errors to members. Requeue pending workspaces if queue dispatch was interrupted after the central transaction committed.
 
+## Members, invitations, and permissions
+
+Publish and run the additive central migration before enabling membership management:
+
+```bash
+php artisan vendor:publish --tag=filament-tenancy-teams-config
+php artisan vendor:publish --tag=filament-tenancy-teams-migrations
+php artisan vendor:publish --tag=filament-tenancy-notifications-migration
+php artisan migrate
+```
+
+The notification migration leaves an existing `notifications` table untouched. For UUID/ULID users, its `notifiable_id` column must support your user keys. The package writes notifications centrally and enables Filament's notification bell. A central notification relationship is supplied dynamically when the configured user model has none; a host-provided relationship is preserved and should use the central connection.
+
+```php
+TenancyPlugin::make()->withMembers();
+```
+
+Alternatively set `teams.enabled => true`. Every member can view the Members page. Owners manage managers and transfer ownership; managers invite and manage ordinary members. A last owner must transfer ownership before leaving. Existing `is_owner` flags remain compatible with profile and domain authorization. Transfers make the recipient owner and the previous owner manager.
+
+Email invitations support multiple addresses, expiry, resend, revoke and copy-link. Existing accounts receive a database notification as well as email. Mail uses the application's configured mailer and is sent after the invitation transaction commits. Configure a working mail transport. Resend explicitly retries delivery and rotates the URL; duplicate invitations neither send another email nor reserve another seat. Bulk results report individual validation/capacity errors.
+
+Shareable links have a role, expiry and use limit. Email invitations reserve seats; shareable links consume seats only when accepted. All mutation entrypoints serialize against the central team row. The Members page hides management controls from ordinary members and disables new invitations when full; server-side authorization and capacity checks also apply.
+
+### Authentication
+
+The panel's standard Filament login and registration pages are automatically replaced with invitation-aware subclasses. Registration must already be enabled with `->registration()`; the package does not enable public signup itself. Invited email addresses are prefilled, read-only, and checked server-side. Opening a link as a guest stages it in the central session. Membership is added only after authentication completes, including MFA. Signed-in users confirm with a CSRF-protected POST.
+
+Custom authentication pages are preserved. Extend `Liern\FilamentTenancy\Teams\Auth\Login` / `Register`, or reuse `LocksInvitationEmail`, calling `enforceInvitationEmail()` from your login credential and registration data hooks. The standard Laravel `Login` and `Verified` events drive continuation and verified-account automatic acceptance. Custom auth flows must emit `Login` only after their complete authentication/MFA process. Invitation endpoints use the configured central domain and existing workspace provisioning/custom-domain redirects.
+
+Automatic acceptance on login requires `hasVerifiedEmail()` to return true. A valid email invitation URL proves email possession for that invitation without marking the account globally verified. Shareable links are not email-bound. Wrong-email sessions cannot accept email invitations. Set `teams.auto_accept => false` to disable acceptance of other matching pending invitations while retaining opened-link continuation.
+
+### Roles and service APIs
+
+Configure Jetstream-style definitions in `config/teams.php`:
+
+```php
+'roles' => [
+    'manager' => ['name' => 'Manager', 'permissions' => ['reports.view']],
+    'member' => ['name' => 'Member', 'permissions' => ['reports.view']],
+],
+'manager_roles' => ['manager'],
+'manager_assignable_roles' => ['member'],
+```
+
+`owner` is reserved and cannot be invited or assigned by ordinary role changes. Only `initializeOwner()` for an empty team and `transferOwnership()` grant ownership. Keep a `manager` role available for ownership transfers. Management capabilities derive from `manager_roles`; `manager_assignable_roles` cannot grant ownership or a configured manager role. Other permission names come from role definitions, with `*` supported. Owners have all team permissions in the built-in provider.
+
+```php
+use Liern\FilamentTenancy\Teams\Teams;
+use Liern\FilamentTenancy\Teams\Invitations;
+
+$teams = app(Teams::class);
+$teams->members($team)->get();
+$teams->forUser($user)->get();
+$teams->hasTeamPermission($user, $team, 'reports.view');
+$teams->addMember($actor, $team, $user, 'member');
+$teams->changeRole($actor, $team, $user, 'manager');
+$teams->removeMember($actor, $team, $user); // Pass the same actor/user to leave.
+$teams->transferOwnership($owner, $team, $recipient);
+
+app(Invitations::class)->inviteMany($actor, $team, ['one@example.com', 'two@example.com'], 'member');
+$link = app(Invitations::class)->create($actor, $team, 'member', useLimit: 5);
+app(Invitations::class)->accept($user, $link->token);
+```
+
+The service constructs relationships from configured models and columns; it does not require package traits. `HasWorkspaces` adds the optional `$user->hasTeamPermission($team, $permission)` helper. On routes where Filament has resolved the authenticated tenant, use `->middleware('team.can:reports.view')` or `@teamcan('reports.view') ... @endteamcan`. Missing membership or tenant context denies access.
+
+### Seat limits and personal teams
+
+`teams.seat_limit` defaults to `null` (unlimited). It includes owners, members, and active pending email invitations. Configure `teams.seat_limit_resolver` with a class implementing `Liern\FilamentTenancy\Teams\Contracts\SeatLimitResolver::limit(Model $team): ?int` to read the subscription plan. A configured resolver takes precedence over the static limit, including a `null` unlimited result. Resolver failures block capacity-increasing operations. Lowering a plan does not remove existing members; new acceptance waits until capacity is available.
+
+`teams.personal_teams => true` creates one personal workspace per registration, using the existing queued provisioning lifecycle and a unique slug. This is disabled by default. External models must provide `teams.personal_team_creator`, a class with `create(Model $user): Model` that creates the team and its owner. Personal-team creation is idempotent by central user ID.
+
+### Filament Shield
+
+Install Shield 4.x and configure its normal auth provider and tenant support:
+
+```bash
+composer require bezhansalleh/filament-shield:^4.0
+```
+
+Before running Spatie's central migrations, enable `permission.teams`. Set `filament-shield.tenant_model` to your configured tenant model and add Spatie's `HasRoles` behavior to the authentication model. Configure custom role and permission models with an explicit central connection, for example:
+
+```php
+class Role extends \Spatie\Permission\Models\Role
+{
+    public function getConnectionName()
+    {
+        return config('filament-tenancy.central_connection');
+    }
+}
+```
+
+Apply the same override to the permission model and set `permission.models.role` / `permission.models.permission`. For string tenant IDs or UUID user IDs, adapt Spatie's team/morph key column types in your application's migration before running it. Existing Spatie installations must migrate to teams mode following Spatie's upgrade instructions; this package never changes host-owned permission tables automatically.
+
+```php
+$panel
+    ->plugin(\BezhanSalleh\FilamentShield\FilamentShieldPlugin::make())
+    ->plugin(TenancyPlugin::make()->withFilamentShield());
+```
+
+Enable `teams.shield.enabled` in configuration when preferred. Shield remains an optional runtime dependency. Seed the `member` and `manager` roles for the panel guard before inviting members. Role selectors use the configured Spatie role model, current team/shared role definitions, and panel guard. Super-admin, owner, excluded roles, and roles belonging to other teams or guards cannot be assigned. `teams.shield.excluded_roles` adds exclusions. Manager assignment remains constrained by the membership configuration above.
+
+The package tracks one managed Spatie role assignment per membership, preserving unrelated assignments and other teams. Membership changes synchronize that assignment transactionally. Existing externally assigned roles are not claimed by the package. Removing a member removes only the tracked assignment; host-owned unrelated roles remain, while membership checks deny tenant access.
+
+Tenant middleware sets Spatie's team ID and clears loaded role/permission relations on each HTTP/Livewire request. Context is reset on completion and exceptions, so `$user->can()` evaluates against the current tenant. `hasTeamPermission()` evaluates explicit team permissions through Spatie and restores the previous context afterward. Ownership grants team-management capabilities, not Shield super-admin or business-resource permissions. Optionally map owners to an eligible business role with `teams.shield.owner_role`; it cannot be a reserved/super-admin role. Host Gate overrides do not bypass membership-service ownership restrictions.
+
+### External Filament tenancy preset
+
+For an application that already owns its Filament tenant model and lifecycle, set these values in `config/teams.php` **before migrations or application boot**:
+
+```php
+'enabled' => true,
+'external' => true,
+'model' => App\Models\Tenant::class,
+'user_model' => App\Models\User::class,
+'connection' => 'central',
+'pivot' => 'tenant_user',
+'team_key' => 'tenant_id',
+'user_key' => 'user_id',
+'owner_column' => null,
+```
+
+Then register `TenancyPlugin::make()->useFilamentTenancy(App\Models\Tenant::class)`. This reuses the pivot and supports string tenant IDs without changing existing workspace IDs. Publish only the teams migration for this preset, not the workspace/provisioning migrations. The existing pivot must have tenant/user keys, timestamps, and a unique pair; the teams migration adds `role` and `managed_role_id`. Establish existing ownership with an application migration; the adapter cannot infer owners without an owner column. Configure `owner_column` if the host has one.
+
+The external preset does not configure Stancl provisioning or resource scoping. Keep your own Filament tenant model options and lifecycle configuration. Filament still requires the user's `HasTenants` contract, but its methods can delegate to `Teams::forUser()` and `Teams::membership()` without a package trait. Configured storage/model mappings are application-wide, as are existing tenancy settings; do not mix incompatible schemas across panels in one application.
+
+### Events, publishing, and cleanup
+
+Events under `Liern\FilamentTenancy\Teams\Events` are dispatched after commit: `MemberInvited`, `InvitationAccepted`, `MemberAdded`, `MemberRoleChanged`, `MemberRemoved`, and `OwnershipTransferred`. Exceptions extend `Teams\Exceptions\TeamsException` and expose a machine-readable `reason`.
+
+```bash
+php artisan vendor:publish --tag=filament-tenancy-views
+php artisan vendor:publish --tag=filament-tenancy-translations
+php artisan teams:prune-invitations
+```
+
+Schedule `teams:prune-invitations` daily after enabling the feature. It removes expired, revoked, consumed, or exhausted invitations after `teams.retention_days` (30 by default). Invitations expire after seven days by default; resends have a 60-second cooldown; shareable links default to one use. Tokens are hashed for lookup and encrypted for copying. Keep the application encryption key stable.
+
+Disable the feature to roll back behavior while preserving data. Reversing the teams migration discards invitation/personal-team records and role metadata; existing `workspace_user` memberships and synchronized `is_owner` flags remain. The optional notification migration intentionally never drops a host-owned notification table.
+
 ## Isolation boundaries
 
 HTTP middleware checks current membership and readiness before switching connections, including Livewire updates. An outer middleware resets context after requests, even on exceptions. A Livewire batch cannot mix workspaces. Central users, workspace records, and default database-backed sessions/cache/queues stay on the central connection. If you configure custom stores/connections, pin those explicitly as well.

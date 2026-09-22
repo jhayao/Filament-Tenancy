@@ -25,5 +25,6 @@ Schema::create('jobs', function (Blueprint $table) {
     $table->unsignedInteger('created_at');
 });
 Artisan::call('migrate', ['--path' => dirname(__DIR__, 2).'/database/migrations', '--realpath' => true, '--force' => true]);
+(require dirname(__DIR__, 2).'/database/optional-migrations/2026_01_05_000001_create_team_notifications.php')->up();
 Artisan::call('filament:assets');
 User::create(['name' => 'Browser Owner', 'email' => 'owner@example.test', 'password' => Hash::make('browser-password')]);
