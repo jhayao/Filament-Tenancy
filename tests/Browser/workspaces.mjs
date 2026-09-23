@@ -153,6 +153,8 @@ try {
     assert.equal(await guest.getByLabel('Email address').inputValue(), 'invited@example.test');
     assert.equal(await guest.getByLabel('Email address').getAttribute('readonly'), 'readonly');
     await guest.getByRole('link', { name: 'sign up' }).click();
+    await guest.waitForURL('**/admin/register');
+    await guest.waitForLoadState('networkidle');
     await guest.getByLabel('Name', { exact: false }).fill('Invited Member');
     assert.equal(await guest.getByLabel('Email address').inputValue(), 'invited@example.test');
     await guest.locator('[id="form.password"]').fill('invitation-password');
