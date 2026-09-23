@@ -10,6 +10,7 @@ use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Artisan;
 use Liern\FilamentTenancy\Enums\ProvisioningStatus;
 use Liern\FilamentTenancy\Support\TenantModel;
+use Liern\FilamentTenancy\Teams\ShieldRoleSeeder;
 use RuntimeException;
 use Throwable;
 
@@ -78,6 +79,10 @@ class ProvisionWorkspace implements ShouldQueue
                         tenancy()->initialize($previousTenant);
                     }
                 }
+            }
+
+            if (config('teams.enabled') && app(ShieldRoleSeeder::class)->enabled()) {
+                app(ShieldRoleSeeder::class)->seed($tenant);
             }
 
             $tenant->update(['status' => ProvisioningStatus::Ready]);

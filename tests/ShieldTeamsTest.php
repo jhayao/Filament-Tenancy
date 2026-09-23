@@ -10,6 +10,7 @@ use Liern\FilamentTenancy\Services\CreateWorkspace;
 use Liern\FilamentTenancy\Teams\Exceptions\InvalidRoleException;
 use Liern\FilamentTenancy\Teams\Exceptions\TeamsConfigurationException;
 use Liern\FilamentTenancy\Teams\Shield;
+use Liern\FilamentTenancy\Teams\ShieldRoleSeeder;
 use Liern\FilamentTenancy\Teams\Teams;
 use Liern\FilamentTenancy\Tests\Fixtures\CentralPermission;
 use Liern\FilamentTenancy\Tests\Fixtures\CentralRole;
@@ -148,5 +149,63 @@ class ShieldTeamsTest extends TestCase
         $this->assertSame('member', $teams->role($a, $user));
         $this->assertSame('central', (new CentralRole)->getConnectionName());
         app(Shield::class)->context($a, $user, fn () => $this->assertTrue($user->hasRole('member')));
+    }
+
+    public function test_configured_roles_are_seeded_per_workspace_and_are_idempotent(): void
+    {
+        config(['teams.shield.seeding.enabled' => true]);
+        $owner = ShieldUser::create(['name' => 'Owner', 'email' => 'owner@example.test']);
+        $a = app(CreateWorkspace::class)->create($owner, ['name' => 'One', 'slug' => 'one']);
+        $b = app(CreateWorkspace::class)->create($owner, ['name' => 'Two', 'slug' => 'two']);
+
+        $this->assertSame(2, CentralRole::query()->where('team_id', $a->getKey())->count());
+        $this->assertSame(2, CentralRole::query()->where('team_id', $b->getKey())->count());
+        $this->assertSame(3, CentralPermission::query()->count());
+        $this->assertSame(['members.invite', 'members.remove', 'members.update'], CentralRole::query()
+            ->where(['name' => 'manager', 'team_id' => $a->getKey()])->firstOrFail()->permissions()->pluck('name')->sort()->values()->all());
+
+        $result = app(ShieldRoleSeeder::class)->seed($a);
+
+        $this->assertSame([
+            'roles' => 0,
+            'roles_reused' => 2,
+            'permissions' => 0,
+            'permissions_reused' => 3,
+        ], $result);
+        $this->assertSame(4, CentralRole::query()->count());
+        $this->assertSame(3, CentralPermission::query()->count());
+    }
+
+    public function test_role_seeding_runs_before_owner_assignment_and_supports_shared_workspaces(): void
+    {
+        config([
+            'filament-tenancy.database_strategy' => 'shared',
+            'teams.shield.seeding.enabled' => true,
+            'teams.shield.owner_role' => 'manager',
+        ]);
+        $owner = ShieldUser::create(['name' => 'Owner', 'email' => 'owner@example.test']);
+        $workspace = app(CreateWorkspace::class)->create($owner, ['name' => 'Shared', 'slug' => 'shared']);
+
+        $this->assertSame('owner', app(Teams::class)->role($workspace, $owner));
+        app(Shield::class)->context($workspace, $owner, fn () => $this->assertTrue($owner->hasRole('manager')));
+        $this->assertSame(2, CentralRole::query()->where('team_id', $workspace->getKey())->count());
+    }
+
+    public function test_role_seeding_command_is_idempotent(): void
+    {
+        config(['teams.shield.seeding.enabled' => true]);
+        $owner = ShieldUser::create(['name' => 'Owner', 'email' => 'owner@example.test']);
+        $workspace = app(CreateWorkspace::class)->create($owner, ['name' => 'One', 'slug' => 'one']);
+
+        $this->artisan('workspaces:seed-roles', ['workspace' => $workspace->getKey()])
+            ->assertExitCode(0);
+
+        $this->assertSame(2, CentralRole::query()->where('team_id', $workspace->getKey())->count());
+
+        $other = app(CreateWorkspace::class)->create($owner, ['name' => 'Two', 'slug' => 'two']);
+        $this->artisan('workspaces:seed-roles', ['--all' => true])
+            ->assertExitCode(0);
+
+        $this->assertSame(2, CentralRole::query()->where('team_id', $other->getKey())->count());
     }
 }

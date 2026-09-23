@@ -308,13 +308,7 @@ The service constructs relationships from configured models and columns; it does
 
 ### Filament Shield
 
-Install Shield 4.x and configure its normal auth provider and tenant support:
-
-```bash
-composer require bezhansalleh/filament-shield:^4.0
-```
-
-Before running Spatie's central migrations, enable `permission.teams`. Set `filament-shield.tenant_model` to your configured tenant model and add Spatie's `HasRoles` behavior to the authentication model. Configure custom role and permission models with an explicit central connection, for example:
+Filament Shield 4.x is installed automatically with this package. Configure its normal auth provider and tenant support before using the integration. Before running Spatie's central migrations, enable `permission.teams`. Set `filament-shield.tenant_model` to your configured tenant model and add Spatie's `HasRoles` behavior to the authentication model. Configure custom role and permission models with an explicit central connection, for example:
 
 ```php
 class Role extends \Spatie\Permission\Models\Role
@@ -334,7 +328,36 @@ $panel
     ->plugin(TenancyPlugin::make()->withFilamentShield());
 ```
 
-Enable `teams.shield.enabled` in configuration when preferred. Shield remains an optional runtime dependency. Seed the `member` and `manager` roles for the panel guard before inviting members. Role selectors use the configured Spatie role model, current team/shared role definitions, and panel guard. Super-admin, owner, excluded roles, and roles belonging to other teams or guards cannot be assigned. `teams.shield.excluded_roles` adds exclusions. Manager assignment remains constrained by the membership configuration above.
+Enable `teams.shield.enabled` in configuration when preferred. The integration remains opt-in at runtime even though Shield is installed with the package. Role selectors use the configured Spatie role model, current team/shared role definitions, and panel guard. Super-admin, owner, excluded roles, and roles belonging to other teams or guards cannot be assigned. `teams.shield.excluded_roles` adds exclusions. Manager assignment remains constrained by the membership configuration above.
+
+#### Workspace role seeding
+
+Workspace roles are stored in Shield's central roles table with the configured team foreign key. Permissions are global central records, while each workspace receives its own role rows. Enable idempotent role seeding after publishing and running Spatie's team-mode permission migrations:
+
+```php
+'shield' => [
+    'enabled' => true,
+    'seeding' => [
+        'enabled' => true,
+        // Defaults to the keys and permissions in teams.roles.
+        'roles' => null,
+        // Optional role-keyed overrides:
+        // 'permissions' => ['manager' => ['reports.view']],
+        'permissions' => null,
+    ],
+],
+```
+
+The keys in `teams.roles` become the Shield role names (`manager`, `member`, and so on); the `name` value remains the label used by the built-in membership flow. The seeder never removes unrelated roles or permissions and rejects the reserved `owner`, Shield super-admin, and excluded role names.
+
+New workspaces seed their central roles before owner assignment and repeat the idempotent step during provisioning retries. Existing workspaces can be repaired or populated with:
+
+```bash
+php artisan workspaces:seed-roles WORKSPACE_ID
+php artisan workspaces:seed-roles --all
+```
+
+The command requires both `teams.shield.enabled` and `teams.shield.seeding.enabled`. It supports dedicated and shared workspace database strategies because Shield role and permission records always remain on the central connection. The existing `filament-tenancy.seeder` setting continues to seed application tables in each dedicated tenant database and is independent of Shield role seeding.
 
 The package tracks one managed Spatie role assignment per membership, preserving unrelated assignments and other teams. Membership changes synchronize that assignment transactionally. Existing externally assigned roles are not claimed by the package. Removing a member removes only the tracked assignment; host-owned unrelated roles remain, while membership checks deny tenant access.
 

@@ -23,6 +23,11 @@ return [
         'configuration' => 'Team configuration is incomplete.',
         'shield_configuration' => 'Install Filament Shield, enable permission.teams, and configure a user with Spatie HasRoles support.',
         'shield_connection' => 'Configure Spatie role and permission models with an explicit central connection.',
+        'shield_tables' => 'Run Spatie permission migrations on the central connection before seeding workspace roles.',
+        'shield_seeding_disabled' => 'Enable teams.shield.enabled and teams.shield.seeding.enabled before seeding workspace roles.',
+        'shield_role_definitions' => 'Configure teams.shield.seeding.roles as an array of role definitions.',
+        'shield_permissions' => 'Configure each seeded role permission list as an array of non-empty strings.',
+        'shield_reserved_role' => 'Workspace role definitions cannot use owner, Shield super-admin, or excluded role names.',
         'personal_creator' => 'Configure teams.personal_team_creator when using external tenant models.',
     ],
 ];

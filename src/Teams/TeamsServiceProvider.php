@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Liern\FilamentTenancy\Commands\PruneTeamInvitations;
+use Liern\FilamentTenancy\Commands\SeedShieldRoles;
 use Liern\FilamentTenancy\Http\Controllers\TeamInvitationController;
 use Liern\FilamentTenancy\Http\Middleware\TeamCan;
 use Liern\FilamentTenancy\Teams\Auth\InvitationContext;
@@ -43,7 +44,7 @@ class TeamsServiceProvider extends ServiceProvider
             }
         });
         if ($this->app->runningInConsole()) {
-            $this->commands([PruneTeamInvitations::class]);
+            $this->commands([PruneTeamInvitations::class, SeedShieldRoles::class]);
             $this->publishesMigrations([__DIR__.'/../../database/migrations/2026_01_05_000000_create_team_invitations.php' => database_path('migrations/2026_01_05_000000_create_team_invitations.php')], 'filament-tenancy-teams-migrations');
             $this->publishes([__DIR__.'/../../resources/views' => resource_path('views/vendor/filament-tenancy')], 'filament-tenancy-views');
             $this->publishes([__DIR__.'/../../config/teams.php' => config_path('teams.php')], 'filament-tenancy-teams-config');

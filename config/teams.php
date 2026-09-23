@@ -25,5 +25,14 @@ return [
     'auto_accept' => true,
     'personal_teams' => false,
     'personal_team_creator' => null,
-    'shield' => ['enabled' => false, 'excluded_roles' => [], 'owner_role' => null],
+    'shield' => [
+        'enabled' => false,
+        'excluded_roles' => [],
+        'owner_role' => null,
+        'seeding' => [
+            'enabled' => false,
+            'roles' => null, // Defaults to teams.roles; keys become workspace role names.
+            'permissions' => null, // Optional role-keyed permission overrides.
+        ],
+    ],
 ];
