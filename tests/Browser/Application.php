@@ -17,6 +17,7 @@ use Liern\FilamentTenancy\TenancyServiceProvider;
 use Liern\FilamentTenancy\Tests\Fixtures\TestPanelProvider;
 use Liern\FilamentTenancy\Tests\Fixtures\User;
 use Livewire\LivewireServiceProvider;
+use STS\FilamentImpersonate\FilamentImpersonateServiceProvider;
 
 class Application extends \Orchestra\Testbench\Foundation\Application
 {
@@ -35,6 +36,7 @@ class Application extends \Orchestra\Testbench\Foundation\Application
             WidgetsServiceProvider::class,
             FilamentServiceProvider::class,
             LivewireServiceProvider::class,
+            FilamentImpersonateServiceProvider::class,
             \Stancl\Tenancy\TenancyServiceProvider::class,
             TenancyServiceProvider::class,
             TestPanelProvider::class,

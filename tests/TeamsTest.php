@@ -204,8 +204,8 @@ class TeamsTest extends TestCase
         Livewire::test(Members::class)
             ->assertSee('People with access to this workspace.')
             ->assertSee('Pending invitations')
-            ->assertSeeHtml('>2</p>')
-            ->assertSee('/ ∞')
+            ->assertSee('fi-wi-stats-overview-stat')
+            ->assertSee('2 / ∞')
             ->assertSee($member->email)
             ->assertSee('No invitations yet.')
             ->assertSee('Impersonate');

@@ -100,11 +100,49 @@ try {
     await page.getByRole('link', { name: 'Browser Beta', exact: true }).click();
     await page.waitForURL('**/admin/workspaces/browser-beta');
     await page.goto(`${baseURL}/admin/workspaces/browser-beta/members`);
+    async function assertMembersLayout(subject) {
+        for (const dark of [false, true]) {
+            await subject.evaluate(value => document.documentElement.classList.toggle('dark', value), dark);
+            for (const width of [1440, 390]) {
+                await subject.setViewportSize({ width, height: 900 });
+                const layout = await subject.locator('.fi-tenancy-members').evaluate(root => {
+                    const bounds = element => {
+                        const { x, y, width, height } = element.getBoundingClientRect();
+                        return { x, y, width, height };
+                    };
+                    const row = [...root.querySelectorAll('[wire\\:key^="member-"]')].at(-1);
+                    return {
+                        stats: [...root.querySelectorAll('.fi-wi-stats-overview-stat')].map(bounds),
+                        identity: bounds(row.querySelector('.fi-tenancy-members-identity')),
+                        actions: bounds(row.querySelector('.fi-tenancy-members-actions')),
+                        direction: getComputedStyle(row).flexDirection,
+                        identityDisplay: getComputedStyle(row.querySelector('.fi-tenancy-members-identity')).display,
+                        overflow: document.documentElement.scrollWidth > innerWidth,
+                    };
+                });
+                assert.equal(layout.stats.length, 3);
+                assert.equal(layout.identityDisplay, 'flex');
+                assert.equal(layout.overflow, false, `Members overflow at ${width}px`);
+                if (width === 1440) {
+                    assert.equal(layout.direction, 'row');
+                    assert.ok(layout.stats.every(stat => Math.abs(stat.y - layout.stats[0].y) < 1), 'Desktop stats must share a row');
+                    assert.ok(layout.actions.x >= layout.identity.x + layout.identity.width, 'Desktop actions must sit to the right of identity');
+                } else {
+                    assert.equal(layout.direction, 'column');
+                    assert.ok(layout.stats[1].y >= layout.stats[0].y + layout.stats[0].height, 'Mobile stats must stack');
+                    assert.ok(layout.actions.y >= layout.identity.y + layout.identity.height, 'Mobile actions must stack below identity');
+                }
+            }
+        }
+        await subject.setViewportSize({ width: 1440, height: 900 });
+    }
+    await assertMembersLayout(page);
     await page.getByRole('button', { name: 'Invite members', exact: true }).click();
     await page.getByLabel('Email addresses').fill('invited@example.test');
     await page.getByRole('button', { name: 'Submit', exact: true }).click();
-    await page.getByText('invited@example.test · member', { exact: true }).waitFor();
+    await page.getByText('invited@example.test', { exact: true }).waitFor();
     const invitationURL = php(['tests/Browser/invitation.php']).trim();
+    const ownerPage = page;
     const guestContext = await browser.newContext();
     const guest = await guestContext.newPage();
     page = guest;
@@ -115,6 +153,8 @@ try {
     assert.equal(await guest.getByLabel('Email address').inputValue(), 'invited@example.test');
     assert.equal(await guest.getByLabel('Email address').getAttribute('readonly'), 'readonly');
     await guest.getByRole('link', { name: 'sign up' }).click();
+    await guest.waitForURL('**/admin/register');
+    await guest.waitForLoadState('networkidle');
     await guest.getByLabel('Name', { exact: false }).fill('Invited Member');
     assert.equal(await guest.getByLabel('Email address').inputValue(), 'invited@example.test');
     await guest.locator('[id="form.password"]').fill('invitation-password');
@@ -123,13 +163,18 @@ try {
     await guest.waitForURL('**/admin/workspaces/browser-beta');
     await guest.waitForLoadState('networkidle');
     await guest.goto(`${baseURL}/admin/workspaces/browser-beta/members`);
-    await guest.getByText('Invited Member', { exact: true }).waitFor();
+    await guest.locator('.fi-tenancy-members').getByText('Invited Member', { exact: true }).waitFor();
     assert.equal(await guest.getByRole('button', { name: 'Invite members', exact: true }).count(), 0);
+    await assertMembersLayout(guest);
+    await ownerPage.goto(`${baseURL}/admin/workspaces/browser-beta/members`);
+    await ownerPage.getByRole('button', { name: 'Impersonate', exact: true }).waitFor();
+    await assertMembersLayout(ownerPage);
+    page = ownerPage;
     await guestContext.close();
     assert.deepEqual(errors, [], 'Browser JavaScript errors');
     console.log('Browser flow passed: workspace provisioning/switching and invitation → locked-email registration → membership.');
 } catch (error) {
-    if (page) {
+    if (page && !page.isClosed()) {
         console.error((await page.locator('body').innerText()).slice(0, 5000));
         console.error(await page.locator('input').evaluateAll(inputs => inputs.map(input => ({ id: input.id, type: input.type, labels: [...(input.labels || [])].map(label => label.textContent) }))));
     }
