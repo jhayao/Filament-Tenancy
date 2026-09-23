@@ -1,20 +1,86 @@
 # Lona Tenancy
 
-A standalone Filament v5 Composer plugin for dedicated database workspaces.
+[![PHP 8.3+](https://img.shields.io/badge/PHP-8.3%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/)
+[![Laravel 12–13](https://img.shields.io/badge/Laravel-12%20%7C%2013-FF2D20?logo=laravel&logoColor=white)](https://laravel.com/)
+[![Filament 5](https://img.shields.io/badge/Filament-5-FDAE4B)](https://filamentphp.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-This package provides workspace onboarding, central users and memberships, Filament's searchable workspace switcher, queued database creation/migrations/optional seeding, shared or dedicated database strategies, a polling setup screen, custom domains, profiles, database pools, billing-provider wiring, and operator commands. Each dedicated workspace has its own database named `tenant_{slug}` and an auto-incrementing integer ID; tenant tables do not need `tenant_id`.
+**Dedicated database workspaces for Filament 5.** Give each customer a workspace they can manage, with queued provisioning and workspace-aware access built around Laravel and the public `stancl/tenancy` package.
 
-Uses public `stancl/tenancy` v3.10, not a private tenancy dependency. Path routing keeps login and workspaces on one origin: `/admin/workspaces/acme`; subdomain routing is available with `identification => 'subdomain'`. The package keeps the Lona namespace and implements the documented behavior independently.
+Lona Tenancy handles workspace setup, membership, provisioning and database context. Choose a dedicated database per workspace or a shared database with resource scoping. With dedicated databases, each workspace has its own `tenant_{slug}` database and integer ID; tenant tables do not need a `tenant_id` column.
 
-## Requirements
+## What it includes
 
-- PHP 8.3+; Laravel 12 or 13; Filament 5 with Livewire 4.
-- A new tenancy installation. This package owns Stancl's tenant model, database and queue bootstrappers, and lifecycle listeners; do not combine it with another tenancy provider or run `tenancy:install`.
-- SQLite, MySQL/MariaDB, or PostgreSQL supported by Stancl. The integration suite runs against SQLite, MySQL and PostgreSQL. Verify credentials and database-creation privileges in your deployment.
+| Workspace experience | Operations | Integrations |
+| --- | --- | --- |
+| Onboarding, searchable switcher, profiles, memberships and invitations | Queued setup, retries, database pools and operator commands | Custom domains, Filament Shield, billing and resource syncing |
+
+## How a request reaches a workspace
+
+```mermaid
+flowchart LR
+    Request --> Resolve["Resolve workspace by path or subdomain"]
+    Resolve --> Check["Check central membership and readiness"]
+    Check --> Strategy{"Database strategy"}
+    Strategy --> Dedicated["Dedicated workspace database"]
+    Strategy --> Shared["Shared database with workspace resource scope"]
+```
+
+## Choose your setup
+
+| If you are… | Start with… |
+| --- | --- |
+| Adding workspaces to a new tenancy setup | [Installation](#install-in-an-application) |
+| Adding memberships to a Filament app that already owns tenancy | [External Filament tenancy preset](#external-filament-tenancy-preset) |
+| Configuring invitations, roles or Shield | [Members and permissions](#members-invitations-and-permissions) |
+
+<details>
+<summary>On this page</summary>
+
+- [Before you start](#before-you-start)
+- [Install in an application](#install-in-an-application)
+  - [Install the package](#install-the-package)
+  - [Publish configuration and migrations](#publish-configuration-and-migrations)
+  - [Database connections](#database-connections)
+  - [User model](#user-model)
+  - [Panel and resources](#panel-and-resources)
+  - [Create your first workspace](#create-your-first-workspace)
+  - [Panel options](#panel-options)
+  - [Custom domains](#custom-domains-on-laravel-cloud-and-cloudflare)
+  - [Custom tenant model](#custom-tenant-model)
+  - [Database pools, billing and resource syncing](#database-pools-billing-and-resource-syncing)
+  - [Queue and retries](#queue-and-retries)
+- [Members, invitations, and permissions](#members-invitations-and-permissions)
+  - [Authentication](#authentication)
+  - [Roles and service APIs](#roles-and-service-apis)
+  - [Seat limits and personal teams](#seat-limits-and-personal-teams)
+  - [Filament Shield](#filament-shield)
+  - [External Filament tenancy preset](#external-filament-tenancy-preset)
+  - [Events, publishing, and cleanup](#events-publishing-and-cleanup)
+- [Isolation boundaries](#isolation-boundaries)
+- [Customize and test](#customize-and-test)
+
+</details>
+
+## Before you start
+
+| Requirement | Supported versions |
+| --- | --- |
+| PHP | 8.3 or later |
+| Laravel | 12 or 13 |
+| Filament | 5 with Livewire 4 |
+| Database | SQLite, MySQL/MariaDB or PostgreSQL supported by Stancl |
+
+> [!WARNING]
+> Use this package for a new Stancl tenancy setup. It owns the tenant model and database/queue bootstrappers, so do not register another tenancy provider or run `tenancy:install`. Database creation also needs the right privileges for your chosen database server.
+
+The package is a Composer library, not a runnable Laravel application, and is not published to Packagist. It uses the public `stancl/tenancy` v3.10 dependency. Path routing keeps login and workspaces on one origin (for example, `/admin/workspaces/acme`); subdomain routing is also available with `identification => 'subdomain'`. The package retains the Lona namespace and implements its behavior independently.
 
 ## Install in an application
 
-This repository is a package, not a runnable Laravel application, and is not published to Packagist. Install the latest tagged release from GitHub by adding the repository to your application's `composer.json`:
+### Install the package
+
+Install the latest tagged release from GitHub by adding the repository to your application's `composer.json`:
 
 ```bash
 composer config repositories.lona-tenancy vcs https://github.com/jhayao/lona-tenancy.git
@@ -28,6 +94,8 @@ composer config repositories.lona-tenancy vcs https://github.com/jhayao/lona-ten
 composer require jhayao/lona-tenancy:dev-main
 ```
 
+### Publish configuration and migrations
+
 Then publish the package configuration and migrations in the application:
 
 ```bash
@@ -37,11 +105,16 @@ php artisan migrate
 mkdir -p database/migrations/tenant
 ```
 
-Central migrations are published by default for existing applications. Set `run_migrations => true` only when the package should load its bundled central migrations automatically; do not enable that option while also publishing the same migrations.
+> [!IMPORTANT]
+> Migrations must be published and run explicitly in production. Central migrations contain users, memberships, sessions, jobs, failed jobs and database-cache tables. Put only workspace business tables in `database/migrations/tenant`; never copy the central users migration there.
 
-Migrations are explicitly published, not automatically loaded in production. Keep users, memberships, sessions, jobs, failed jobs, and database cache tables in central migrations. Put only workspace business tables in `database/migrations/tenant`. Do not copy the central users migration there.
+Central migrations are published by default for existing applications. Set `run_migrations => true` only when the package should load its bundled central migrations automatically; do not enable it while also publishing those same migrations.
 
-Set `TENANCY_CENTRAL_CONNECTION` to your named central connection (defaults to `DB_CONNECTION`). Fresh installs name databases with the `tenant_` prefix followed by the workspace slug; set `TENANCY_DATABASE_NAME_PREFIX` to change the prefix. Keep slugs stable after provisioning because the generated database name is stored with the workspace. SQLite creates workspace database files in the application's `database` directory; make it writable. MySQL/PostgreSQL credentials need database-creation privileges. To use a separate server/template connection, publish Stancl's config without its installer:
+### Database connections
+
+Set `TENANCY_CENTRAL_CONNECTION` to your named central connection (defaults to `DB_CONNECTION`). New dedicated workspaces use the `tenant_` prefix followed by the workspace slug; set `TENANCY_DATABASE_NAME_PREFIX` to change it. Keep slugs stable after provisioning because the database name is stored with the workspace.
+
+SQLite workspace files are created in the application's `database` directory, which must be writable. MySQL and PostgreSQL credentials need database-creation privileges. To use a separate server/template connection, publish Stancl's config without its installer:
 
 ```bash
 php artisan vendor:publish --provider='Stancl\Tenancy\TenancyServiceProvider' --tag=config
@@ -90,7 +163,11 @@ class ProjectResource extends TenantResource
 
 Alternatively declare `protected static bool $isScopedToTenant = false;` on each dedicated resource. The plugin checks this because Filament's default relationship scoping expects a tenant relationship, which dedicated database models do not have. Do not reuse these resource classes in a shared-database tenant panel. Business models should use Laravel's default connection (do not hardcode the central connection). Keep central administration in a separate panel.
 
-Visit `/admin` (or your panel's configured path), sign in, and create a workspace. The switcher also lets existing users create additional workspaces. Filament's tenant creation policy is respected; define a policy for `Liern\FilamentTenancy\Models\Tenant` to restrict signup.
+### Create your first workspace
+
+Visit `/admin` (or your panel's configured path), sign in, and create a workspace. Existing users can create additional workspaces from the switcher.
+
+Filament's tenant creation policy is respected. Define a policy for `Liern\FilamentTenancy\Models\Tenant` to restrict signup.
 
 ### Panel options
 
@@ -129,7 +206,7 @@ TenancyPlugin::make()
 
 Use `withTenantRegistration(null)` (or `registration_page => null`) to remove self-service registration and its menu entry. Existing memberships remain usable. A replacement registration page must extend Filament's `RegisterTenant`; extend this package's `RegisterWorkspace` to retain its provisioning behavior. Route prefixes must be a single lowercase URL segment, such as `teams` or `client-workspaces`.
 
-Additional middleware runs after membership/readiness checks and is persistent on Livewire updates. The setup page also runs this middleware, but remains in the central context; middleware should handle that case. Fluent middleware arrays replace the configured list. Hiding the menu or switcher changes navigation only, not authorization.
+Additional middleware runs after membership/readiness checks and persists across Livewire updates. It also runs on the setup page, which remains in central context, so middleware must handle that case. Fluent middleware arrays replace the configured list. Hiding the menu or switcher changes navigation only; it does not authorize access.
 
 The equivalent nested key is `middleware.extra`. `database_strategy => 'dedicated'` uses connection isolation; `database_strategy => 'shared'` uses the `workspace_id` relationship scope for resources that extend `TenantResource`. Set `scope_resources_to_tenant` explicitly when the strategy default is not appropriate.
 
@@ -155,11 +232,16 @@ TenancyPlugin::make()
     ->customDomains();
 ```
 
-Workspace owners add a hostname from the Custom domains page. The package displays a TXT record at `_lona-verify.<hostname>` and verifies that record before the hostname can identify a workspace. Removing a row immediately disables workspace routing for that hostname. Existing domain rows are left unverified by the additive migration.
+Workspace owners add a hostname from the Custom domains page. The package displays a TXT record at `_lona-verify.<hostname>` and verifies it before the hostname can identify a workspace. Removing a row immediately disables routing for that hostname. Existing domain rows remain unverified after the additive migration.
 
-The package verifies ownership and resolves an already verified host. It does not call the Laravel Cloud or Cloudflare APIs and does not claim that a hostname has been registered, routed, or issued a certificate. Register each verified hostname in Laravel Cloud's Network settings, then add the DNS records Laravel Cloud provides. If the domain's DNS is hosted by Cloudflare, follow Cloudflare's proxy and SSL requirements for the Laravel Cloud origin. Keep the application behind HTTPS and configure Laravel's trusted proxies for the Cloudflare/Laravel Cloud deployment.
+> [!NOTE]
+> This package verifies domain ownership and resolves a verified host. It does not register hostnames with Laravel Cloud or Cloudflare, configure DNS, or issue certificates. Complete those steps with your hosting provider.
 
-Authentication remains anchored to the central application host. When a user opens a verified custom host without its host-only session cookie, the package sends them through the panel's normal login and MFA/email-verification flow, then issues a one-use handoff valid for 60 seconds. The handoff is bound to the verified workspace, panel, guard, user, target host and browser network/user-agent state; it never accepts an arbitrary return URL. Do not set `SESSION_DOMAIN` to a parent domain shared with customer domains.
+Register each verified hostname in Laravel Cloud's Network settings, then add the DNS records Laravel Cloud provides. If Cloudflare hosts the DNS, follow its proxy and SSL requirements for the Laravel Cloud origin. Keep the app behind HTTPS and configure Laravel's trusted proxies for your deployment.
+
+Authentication remains anchored to the central application host. If a user opens a verified custom host without its host-only session cookie, the package sends them through the panel's normal login and MFA/email-verification flow, then issues a one-use handoff valid for 60 seconds.
+
+The handoff is bound to the verified workspace, panel, guard, user, target host and browser network/user-agent state; it never accepts an arbitrary return URL. Do not set `SESSION_DOMAIN` to a parent domain shared with customer domains.
 
 See [Laravel Cloud custom domains](https://laravel.com/cloud/docs/domains), [Cloudflare custom hostnames](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/domain-support/create-custom-hostnames/), and [the package custom-domain workflow](https://packstub.dev/docs/filament-tenancy/custom-domains) for the hosting and DNS steps outside this package.
 
@@ -208,7 +290,7 @@ Resource syncing is opt-in and uses Stancl's `Syncable`/`SyncMaster` contracts w
 
 ### Queue and retries
 
-Use an asynchronous queue for production:
+Use an asynchronous queue in production so workspace creation does not hold up signup:
 
 ```dotenv
 TENANCY_QUEUE_CONNECTION=database
@@ -219,11 +301,14 @@ php artisan queue:work database --timeout=300
 php artisan workspaces:retry WORKSPACE_ID
 ```
 
-Create the normal Laravel queue tables centrally if using the database queue. Use a shared cache driver that supports atomic locks for multiple workers. Set the queue's `retry_after` (or visibility timeout) above the job's 300-second timeout and the lock's 360-second expiry, for example 420 seconds. The job retries up to three times, with 30/120-second backoff. Synchronous queues work for local use but complete provisioning during signup instead of in the background.
+> [!IMPORTANT]
+> Create Laravel's queue tables centrally when using the database queue. For multiple workers, use shared cache with atomic-lock support. Set `retry_after` (or the visibility timeout) above both the job timeout (300 seconds) and lock expiry (360 seconds); 420 seconds is an example.
+
+The job retries up to three times, with 30/120-second backoff. Synchronous queues are useful locally, but provisioning then finishes during signup instead of in the background.
 
 Retries reuse the existing database and run outstanding migrations. Ready workspaces are no-ops. The retry command also recovers a workspace left in provisioning after a killed worker; overlapping queued attempts are serialized by a cache lock. Configure `filament-tenancy.seeder` only with a tenant-safe, idempotent seeder: a failed seeder can run again. Database deletion is deliberately not coupled to model deletion.
 
-Setup failures remain closed to business resources. The browser shows a generic failure message; exceptions go through Laravel's normal worker logging/failed-job handling, without showing credentials or raw SQL errors to members. Requeue pending workspaces if queue dispatch was interrupted after the central transaction committed.
+Setup failures remain closed to business resources. The browser shows a generic error; Laravel handles exceptions through normal worker logging and failed-job handling. Credentials and raw SQL errors are not shown to members. Requeue pending workspaces if queue dispatch was interrupted after the central transaction committed.
 
 ## Members, invitations, and permissions
 
@@ -236,7 +321,9 @@ php artisan vendor:publish --tag=filament-tenancy-notifications-migration
 php artisan migrate
 ```
 
-The notification creation migration leaves an existing `notifications` table untouched. New PostgreSQL tables use a `json` data column, as required by Filament's notification filters; other database drivers retain `text`. The included repair migration converts existing PostgreSQL notification payloads to `json`, preserving their data and metadata, and skips tables already using `json` or `jsonb`. For UUID/ULID users, the `notifiable_id` column must support your user keys. The package writes notifications centrally and enables Filament's notification bell. A central notification relationship is supplied dynamically when the configured user model has none; a host-provided relationship is preserved and should use the central connection.
+The notification creation migration leaves an existing `notifications` table untouched. New PostgreSQL tables use a `json` data column, as required by Filament's notification filters; other database drivers retain `text`. The included repair migration converts existing PostgreSQL notification payloads to `json`, preserving their data and metadata, and skips tables already using `json` or `jsonb`.
+
+For UUID/ULID users, the `notifiable_id` column must support your user keys. The package writes notifications centrally and enables Filament's notification bell. A central notification relationship is supplied dynamically when the configured user model has none; a host-provided relationship is preserved and should use the central connection.
 
 If notifications were already migrated with v0.5.0, updating the package alone does not change the existing column. After installing the package version containing this fix, publish only the repair migration and run it in the host application:
 
@@ -405,7 +492,10 @@ Disable the feature to roll back behavior while preserving data. Reversing the t
 
 HTTP middleware checks current membership and readiness before switching connections, including Livewire updates. An outer middleware resets context after requests, even on exceptions. A Livewire batch cannot mix workspaces. Central users, workspace records, and default database-backed sessions/cache/queues stay on the central connection. If you configure custom stores/connections, pin those explicitly as well.
 
-Only database and queue tenancy are enabled. Cache keys, files/uploads, Redis, external services and custom routes are not automatically isolated. Use workspace-specific keys/paths and authorization for those features. Do not query business tables before tenant middleware, or expose them through unprotected routes. Streaming responses, Octane/concurrent request runtimes, and custom Livewire endpoints are not verified in this release. Use the standard Laravel HTTP lifecycle and Livewire endpoint.
+> [!WARNING]
+> This package isolates database connections and queues. Cache keys, files/uploads, Redis, external services and custom routes are not automatically isolated; scope and authorize those in your application.
+
+Do not query business tables before tenant middleware or expose them through unprotected routes. Streaming responses, Octane/concurrent request runtimes and custom Livewire endpoints are not verified in this release. Use the standard Laravel HTTP lifecycle and Livewire endpoint.
 
 For scripts and custom jobs, explicitly initialize tenancy and always end it in a `finally` block. Do not run arbitrary tenant queries from central pages. Resource model authorization policies remain your application's responsibility.
 
