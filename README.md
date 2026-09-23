@@ -3,6 +3,7 @@
 [![PHP 8.3+](https://img.shields.io/badge/PHP-8.3%2B-777BB4?logo=php&logoColor=white)](https://www.php.net/)
 [![Laravel 12–13](https://img.shields.io/badge/Laravel-12%20%7C%2013-FF2D20?logo=laravel&logoColor=white)](https://laravel.com/)
 [![Filament 5](https://img.shields.io/badge/Filament-5-FDAE4B)](https://filamentphp.com/)
+[![Packagist Version](https://img.shields.io/packagist/v/jhayao/lona-tenancy.svg)](https://packagist.org/packages/jhayao/lona-tenancy)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Dedicated database workspaces for Filament 5.** Give each customer a workspace they can manage, with queued provisioning and workspace-aware access built around Laravel and the public `stancl/tenancy` package.
@@ -74,20 +75,19 @@ flowchart LR
 > [!WARNING]
 > Use this package for a new Stancl tenancy setup. It owns the tenant model and database/queue bootstrappers, so do not register another tenancy provider or run `tenancy:install`. Database creation also needs the right privileges for your chosen database server.
 
-The package is a Composer library, not a runnable Laravel application, and is not published to Packagist. It uses the public `stancl/tenancy` v3.10 dependency. Path routing keeps login and workspaces on one origin (for example, `/admin/workspaces/acme`); subdomain routing is also available with `identification => 'subdomain'`. The package retains the Lona namespace and implements its behavior independently.
+The package is a Composer library, not a runnable Laravel application. Install it from [Packagist](https://packagist.org/packages/jhayao/lona-tenancy); it uses the public `stancl/tenancy` v3.10 dependency. Path routing keeps login and workspaces on one origin (for example, `/admin/workspaces/acme`); subdomain routing is also available with `identification => 'subdomain'`. The package retains the Lona namespace and implements its behavior independently.
 
 ## Install in an application
 
 ### Install the package
 
-Install the latest tagged release from GitHub by adding the repository to your application's `composer.json`:
+Install the latest stable release from Packagist:
 
 ```bash
-composer config repositories.lona-tenancy vcs https://github.com/jhayao/lona-tenancy.git
 composer require jhayao/lona-tenancy:^0.8
 ```
 
-To install the current development branch instead, use `dev-main`:
+To install the latest development branch instead, register the Git repository and require `dev-main`:
 
 ```bash
 composer config repositories.lona-tenancy vcs https://github.com/jhayao/lona-tenancy.git
