@@ -1,13 +1,18 @@
 <?php
 
 return [
-    'members' => 'Members', 'invitation' => 'Invitation', 'invitations' => 'Invitations',
+    'members' => 'Members', 'member_count' => 'Members', 'member_count_help' => 'People with access to this workspace.',
+    'pending_invitations' => 'Pending invitations', 'pending_invitations_help' => 'Invitations waiting to be accepted. Visible to managers.',
+    'seats' => 'Seats', 'seats_help' => 'Members and active email invitations.', 'seat_limit_reached' => 'Seat limit reached',
+    'members_help' => 'Manage workspace access, roles, and ownership.', 'invitations_help' => 'Share an invitation link or resend an email invitation.',
+    'you' => 'You', 'impersonate' => 'Impersonate', 'no_members' => 'No members yet.', 'no_members_help' => 'Invite someone to start collaborating in this workspace.',
+    'invitation' => 'Invitation', 'invitations' => 'Invitations',
     'invite' => 'Invite members', 'emails' => 'Email addresses', 'emails_help' => 'Separate addresses with commas, spaces, or new lines.',
     'role' => 'Role', 'change_role' => 'Change role', 'remove' => 'Remove member',
     'transfer' => 'Transfer ownership', 'leave' => 'Leave team', 'create_link' => 'Create invitation link',
     'shareable_link' => 'Shareable link', 'expires' => 'Expires at', 'use_limit' => 'Use limit',
     'uses' => ':used of :limit uses', 'copy_link' => 'Copy link', 'copied' => 'Copied', 'resend' => 'Resend', 'revoke' => 'Revoke',
-    'active' => 'Active', 'inactive' => 'Inactive', 'no_invitations' => 'No invitations yet.',
+    'active' => 'Active', 'inactive' => 'Inactive', 'no_invitations' => 'No invitations yet.', 'no_invitations_help' => 'Create an invitation to give someone access to this workspace.',
     'saved' => 'Changes saved', 'invited' => 'You have been invited to a team', 'accept' => 'Accept invitation',
     'email_body' => 'You have been invited to join a team. Sign in or create an account to accept your invitation.',
     'email_expiry' => 'Expires: :date', 'join' => 'Join :team', 'personal_name' => ':name’s team', 'pruned' => 'Pruned :count invitations.',

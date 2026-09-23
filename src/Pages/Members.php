@@ -13,12 +13,15 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Liern\FilamentTenancy\Teams\Exceptions\TeamsException;
 use Liern\FilamentTenancy\Teams\Invitation;
 use Liern\FilamentTenancy\Teams\Invitations;
 use Liern\FilamentTenancy\Teams\Teams;
+use STS\FilamentImpersonate\Actions\Impersonate;
+use STS\FilamentImpersonate\Facades\Impersonation;
 
 class Members extends Page
 {
@@ -89,6 +92,59 @@ class Members extends Page
         } catch (TeamsException) {
             return false;
         }
+    }
+
+    public function mayImpersonate(Model $user): bool
+    {
+        $current = Filament::auth()->user();
+
+        if (! $user instanceof Authenticatable || ! $current instanceof Model || ! $current instanceof Authenticatable || ! $this->owner() || Impersonation::isImpersonating()) {
+            return false;
+        }
+
+        if (method_exists($current, 'canImpersonate') && ! $current->canImpersonate()) {
+            return false;
+        }
+
+        if ($current->is($user)) {
+            return false;
+        }
+
+        if (! app(Teams::class)->membership($this->team(), $user)) {
+            return false;
+        }
+
+        return ! method_exists($user, 'canBeImpersonated') || $user->canBeImpersonated();
+    }
+
+    public function impersonateTarget(array $arguments): ?Model
+    {
+        $userId = $arguments['user'] ?? null;
+        if (! is_string($userId) && ! is_int($userId)) {
+            return null;
+        }
+
+        return app(Teams::class)->members($this->team())->whereKey($userId)->first();
+    }
+
+    public function mayImpersonateFromArguments(array $arguments): bool
+    {
+        $user = $this->impersonateTarget($arguments);
+
+        return $user instanceof Model && $this->mayImpersonate($user);
+    }
+
+    public function impersonateAction(): Impersonate
+    {
+        return Impersonate::make('impersonate')
+            ->label(__('filament-tenancy::teams.impersonate'))
+            ->tooltip(__('filament-tenancy::teams.impersonate'))
+            ->record(fn (array $arguments) => $this->impersonateTarget($arguments))
+            ->guard(app(Teams::class)->guard())
+            ->redirectTo(Filament::getUrl($this->team()) ?? Filament::getCurrentPanel()->getUrl())
+            ->authorize(fn (array $arguments) => $this->mayImpersonateFromArguments($arguments))
+            ->authorizationNotification()
+            ->visible(fn (array $arguments) => $this->mayImpersonateFromArguments($arguments));
     }
 
     protected function roleInput(): Select
