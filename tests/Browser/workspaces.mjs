@@ -35,7 +35,7 @@ try {
     page = await browser.newPage();
     page.setDefaultTimeout(15000);
     const errors = [];
-    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('pageerror', (error) => errors.push(error.stack || error.message));
     await page.goto(`${baseURL}/admin/login`);
     await page.getByLabel('Email address').fill('owner@example.test');
     await page.locator('input[autocomplete="current-password"]').fill('browser-password');
@@ -142,12 +142,16 @@ try {
     await page.getByRole('button', { name: 'Submit', exact: true }).click();
     await page.getByText('invited@example.test', { exact: true }).waitFor();
     const invitationURL = php(['tests/Browser/invitation.php']).trim();
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    await page.getByRole('button', { name: 'Copied', exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), invitationURL);
     const ownerPage = page;
     const guestContext = await browser.newContext();
     const guest = await guestContext.newPage();
     page = guest;
     guest.setDefaultTimeout(15000);
-    guest.on('pageerror', (error) => errors.push(error.message));
+    guest.on('pageerror', (error) => errors.push(error.stack || error.message));
     await guest.goto(invitationURL);
     await guest.waitForURL('**/admin/login');
     assert.equal(await guest.getByLabel('Email address').inputValue(), 'invited@example.test');

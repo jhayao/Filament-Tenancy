@@ -77,7 +77,7 @@
                         </div>
                         <div class="fi-tenancy-members-actions">
                             @if ($invitation->isActive())
-                                <x-filament::button color="gray" x-data="{ copied: false }" x-on:click="navigator.clipboard.writeText(@js($invitation->url())).then(() => copied = true)">
+                                <x-filament::button color="gray" :data-invitation-url="$invitation->url()" x-data="{ copied: false }" x-on:click="navigator.clipboard.writeText($el.dataset.invitationUrl).then(() => copied = true)">
                                     <span x-show="! copied">{{ __('filament-tenancy::teams.copy_link') }}</span><span x-show="copied" x-cloak>{{ __('filament-tenancy::teams.copied') }}</span>
                                 </x-filament::button>
                             @endif
