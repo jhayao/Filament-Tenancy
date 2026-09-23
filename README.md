@@ -253,6 +253,8 @@ TenancyPlugin::make()->withMembers();
 
 Alternatively set `teams.enabled => true`. Every member can view the Members page. Owners manage managers and transfer ownership; managers invite and manage ordinary members. A last owner must transfer ownership before leaving. Existing `is_owner` flags remain compatible with profile and domain authorization. Transfers make the recipient owner and the previous owner manager.
 
+The Members page uses Filament v5 schema/stat components and scoped row styles included with the view. It works with the default Filament theme without a Tailwind build or additional `@source` entries. If you override the view and add Tailwind utilities, include your override directory in your custom theme's `@source` scan and rebuild that theme.
+
 Email invitations support multiple addresses, expiry, resend, revoke and copy-link. Existing accounts receive a database notification as well as email. Mail uses the application's configured mailer and is sent after the invitation transaction commits. Configure a working mail transport. Resend explicitly retries delivery and rotates the URL; duplicate invitations neither send another email nor reserve another seat. Bulk results report individual validation/capacity errors.
 
 Shareable links have a role, expiry and use limit. Email invitations reserve seats; shareable links consume seats only when accepted. All mutation entrypoints serialize against the central team row. The Members page hides management controls from ordinary members and disables new invitations when full; server-side authorization and capacity checks also apply.

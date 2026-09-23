@@ -12,7 +12,9 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -72,6 +74,24 @@ class Members extends Page
     public function roster(): Collection
     {
         return app(Teams::class)->members($this->team())->get();
+    }
+
+    public function summary(Schema $schema): Schema
+    {
+        $teams = app(Teams::class);
+        $team = $this->team();
+        $limit = $teams->limit($team);
+
+        return $schema->columns(['default' => 1, 'md' => 3])->components([
+            Stat::make(__('filament-tenancy::teams.member_count'), $teams->members($team)->count())
+                ->description(__('filament-tenancy::teams.member_count_help')),
+            Stat::make(__('filament-tenancy::teams.pending_invitations'), $this->manager()
+                ? $this->invitations()->filter(fn (Invitation $invitation) => $invitation->isActive())->count()
+                : '—')
+                ->description(__('filament-tenancy::teams.pending_invitations_help')),
+            Stat::make(__('filament-tenancy::teams.seats'), $teams->seats($team).' / '.($limit ?? '∞'))
+                ->description(__('filament-tenancy::teams.seats_help')),
+        ]);
     }
 
     public function invitations(): Collection
