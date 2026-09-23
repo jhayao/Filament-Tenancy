@@ -21,7 +21,9 @@ use Liern\FilamentTenancy\Teams\Invitation;
 use Liern\FilamentTenancy\Teams\InvitationMail;
 use Liern\FilamentTenancy\Teams\Invitations;
 use Liern\FilamentTenancy\Teams\Teams;
+use Liern\FilamentTenancy\Tests\Fixtures\RestrictedImpersonationUser;
 use Livewire\Livewire;
+use STS\FilamentImpersonate\Facades\Impersonation;
 
 class TeamsTest extends TestCase
 {
@@ -199,11 +201,99 @@ class TeamsTest extends TestCase
         $url = Members::getUrl(tenant: $team);
         $this->get($url)->assertOk()->assertSee('Members');
         Filament::setTenant($team);
+        Livewire::test(Members::class)
+            ->assertSee('People with access to this workspace.')
+            ->assertSee('Pending invitations')
+            ->assertSeeHtml('>2</p>')
+            ->assertSee('/ ∞')
+            ->assertSee($member->email)
+            ->assertSee('No invitations yet.')
+            ->assertSee('Impersonate');
+        Filament::setTenant($team);
         $this->actingAs($member);
         Livewire::test(Members::class)->assertSee($owner->email)
             ->callAction('role', ['role' => 'manager'], arguments: ['user' => $member->id]);
         $this->assertSame('member', $teams->role($team, $member));
         $this->actingAs($this->user('stranger@example.test'))->get($url)->assertNotFound();
+    }
+
+    public function test_workspace_owner_can_impersonate_another_current_workspace_member(): void
+    {
+        [$owner, $team, $teams] = $this->workspace();
+        $member = $this->user('member@example.test');
+        $teams->addMember($owner, $team, $member, 'member');
+
+        $outside = $this->user('outside@example.test');
+        $component = Livewire::test(Members::class);
+        $this->assertFalse($component->instance()->mayImpersonate($outside));
+        $component->mountAction('impersonate', ['user' => (string) $outside->getKey()])
+            ->callMountedAction();
+        $this->assertAuthenticatedAs($owner);
+        $this->assertFalse(Impersonation::isImpersonating());
+
+        Livewire::test(Members::class)
+            ->callAction('impersonate', arguments: ['user' => (string) $member->getKey()])
+            ->assertRedirect(Filament::getUrl($team));
+
+        $this->assertTrue(Impersonation::isImpersonating());
+        $this->assertAuthenticatedAs($member);
+    }
+
+    public function test_only_workspace_owners_can_impersonate_current_workspace_members(): void
+    {
+        [$owner, $team, $teams] = $this->workspace();
+        $manager = $this->user('manager@example.test');
+        $member = $this->user('member@example.test');
+        $teams->addMember($owner, $team, $manager, 'manager');
+        $teams->addMember($owner, $team, $member, 'member');
+
+        Filament::setTenant($team);
+        $this->actingAs($manager);
+        $component = Livewire::test(Members::class)->assertDontSee('Impersonate');
+        $this->assertFalse($component->instance()->mayImpersonate($member));
+        $this->assertFalse($component->instance()->mayImpersonate($owner));
+        $component->mountAction('impersonate', ['user' => (string) $member->getKey()])
+            ->callMountedAction();
+        $this->assertAuthenticatedAs($manager);
+        $this->assertFalse(Impersonation::isImpersonating());
+    }
+
+    public function test_impersonation_respects_the_host_users_can_be_impersonated_hook(): void
+    {
+        [$owner, $team, $teams] = $this->workspace();
+        config([
+            'filament-tenancy.user_model' => RestrictedImpersonationUser::class,
+            'auth.providers.users.model' => RestrictedImpersonationUser::class,
+        ]);
+        $member = RestrictedImpersonationUser::create(['name' => 'Restricted', 'email' => 'restricted@example.test']);
+        $teams->addMember($owner, $team, $member, 'member');
+
+        Filament::setTenant($team);
+        $component = Livewire::test(Members::class)->assertDontSee('Impersonate');
+        $this->assertFalse($component->instance()->mayImpersonate($member));
+        $component->mountAction('impersonate', ['user' => (string) $member->getKey()])
+            ->callMountedAction();
+
+        $this->assertAuthenticatedAs($owner);
+        $this->assertFalse(Impersonation::isImpersonating());
+    }
+
+    public function test_owner_can_disable_impersonation_using_the_host_users_hook(): void
+    {
+        [$owner, $team, $teams] = $this->workspace();
+        $member = $this->user('member@example.test');
+        $teams->addMember($owner, $team, $member, 'member');
+        $restrictedOwner = RestrictedImpersonationUser::findOrFail($owner->getKey());
+
+        Filament::setTenant($team);
+        $this->actingAs($restrictedOwner);
+        $component = Livewire::test(Members::class)->assertDontSee('Impersonate');
+        $this->assertFalse($component->instance()->mayImpersonate($member));
+        $component->mountAction('impersonate', ['user' => (string) $member->getKey()])
+            ->callMountedAction();
+
+        $this->assertAuthenticatedAs($restrictedOwner);
+        $this->assertFalse(Impersonation::isImpersonating());
     }
 
     public function test_guest_invitation_stages_login_and_signed_in_acceptance_is_post_only(): void

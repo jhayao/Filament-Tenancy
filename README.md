@@ -257,6 +257,8 @@ Email invitations support multiple addresses, expiry, resend, revoke and copy-li
 
 Shareable links have a role, expiry and use limit. Email invitations reserve seats; shareable links consume seats only when accepted. All mutation entrypoints serialize against the central team row. The Members page hides management controls from ordinary members and disables new invitations when full; server-side authorization and capacity checks also apply.
 
+Workspace owners can impersonate another member from the Members page. The action is limited to members of the current workspace, respects the target model's optional `canBeImpersonated()` method, and is unavailable to managers and while already impersonating. Filament's impersonation banner is registered automatically. If the app also serves non-Filament pages, add `<x-impersonate::banner/>` to those Blade layouts so the user can see and leave impersonation.
+
 ### Authentication
 
 The panel's standard Filament login and registration pages are automatically replaced with invitation-aware subclasses. Registration must already be enabled with `->registration()`; the package does not enable public signup itself. Invited email addresses are prefilled, read-only, and checked server-side. Opening a link as a guest stages it in the central session. Membership is added only after authentication completes, including MFA. Signed-in users confirm with a CSRF-protected POST.

@@ -22,6 +22,7 @@ use Liern\FilamentTenancy\Tests\Fixtures\TestPanelProvider;
 use Liern\FilamentTenancy\Tests\Fixtures\User;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use STS\FilamentImpersonate\FilamentImpersonateServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -42,6 +43,7 @@ abstract class TestCase extends Orchestra
             WidgetsServiceProvider::class,
             FilamentServiceProvider::class,
             LivewireServiceProvider::class,
+            FilamentImpersonateServiceProvider::class,
             \Stancl\Tenancy\TenancyServiceProvider::class,
             TenancyServiceProvider::class,
             TestPanelProvider::class,
